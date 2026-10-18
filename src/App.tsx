@@ -6,6 +6,7 @@ import {
 } from './components/SanAndreasWorldCanvas';
 import { GtaHud } from './components/GtaHud';
 import { StudioDrawers } from './components/StudioDrawers';
+import { FullScreenMapModal } from './components/FullScreenMapModal';
 import {
   DEFAULT_GRAPHICS_TUNING,
   GraphicsModeId,
@@ -78,26 +79,23 @@ const INITIAL_WEAPONS: WeaponSlot[] = [
 ];
 
 export function App() {
-  // Core GTA:SA Player Vital Stats (CPlayerInfo @ 0xB7CD98)
   const [stats, setStats] = useState({
     health: 100,
     armor: 50,
-    cash: 350, // Iconic starting cash in Los Santos after Tenpenny drops CJ off in Alley
+    cash: 350,
     respect: 120,
     muscle: 350,
     stamina: 420,
     wantedStars: 0,
   });
 
-  // TimeCycle & Remastered Graphics Tuning State
-  const [gameHour, setGameHour] = useState<number>(18.5); // Golden hour sunset on Grove Street
+  const [gameHour, setGameHour] = useState<number>(18.5);
   const [clockLocked, setClockLocked] = useState<boolean>(false);
   const [weather, setWeather] = useState<WeatherPresetId>('EXTRASUNNY_LA');
   const [tuning, setTuning] = useState<GraphicsTuningConfig>(
     DEFAULT_GRAPHICS_TUNING
   );
 
-  // Active Cheat Flags (m_aCheatsActive @ 0x969130)
   const [neverWanted, setNeverWanted] = useState(false);
   const [godMode, setGodMode] = useState(false);
   const [jetpackActive, setJetpackActive] = useState(false);
@@ -105,16 +103,19 @@ export function App() {
   const [carsFly, setCarsFly] = useState(false);
   const [allCarsNitro, setAllCarsNitro] = useState(false);
 
-  // Weapons & Radio
   const [weapons] = useState<WeaponSlot[]>(INITIAL_WEAPONS);
-  const [weaponIdx, setWeaponIdx] = useState<number>(1); // Start with Spray Can / 9mm ready
+  const [weaponIdx, setWeaponIdx] = useState<number>(1);
   const [stationIdx, setStationIdx] = useState<number>(0);
   const [muted, setMuted] = useState<boolean>(false);
 
-  // UI Drawers & Notifications
   const [activeDrawer, setActiveDrawer] = useState<
     'NONE' | 'GRAPHICS' | 'CHEATS' | 'VEHICLES' | 'MISSIONS' | 'STUDIO_REA'
   >('NONE');
+  const [fullMapOpen, setFullMapOpen] = useState<boolean>(false);
+  const [customWaypoint, setCustomWaypoint] = useState<[number, number] | null>(
+    null
+  );
+
   const [cheatToast, setCheatToast] = useState<{
     code: string;
     description: string;
@@ -131,7 +132,6 @@ export function App() {
     subtitle: string;
   } | null>(null);
 
-  // Imperative Dispatch Nonces to 3D World Canvas
   const [spawnRequest, setSpawnRequest] = useState<{
     vehicleId: string;
     nonce: number;
@@ -153,10 +153,10 @@ export function App() {
 
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot>({
     fps: 60,
-    playerX: 0,
+    playerX: 40,
     playerY: 0,
-    playerZ: -34,
-    headingRad: 0,
+    playerZ: 4,
+    headingRad: -Math.PI / 2,
     speedKmh: 0,
     inVehicle: null,
     vehicleHealth: 1000,
@@ -200,7 +200,6 @@ export function App() {
     []
   );
 
-  // Execute a matched GTA:SA Cheat Definition (CCheat::ApplyCheat @ 0x438370)
   const executeCheat = useCallback((cheat: CheatDefinition) => {
     audioEngine.playCheatActivated();
     setCheatToast({ code: cheat.code, description: cheat.description });
@@ -287,7 +286,6 @@ export function App() {
     }
   }, []);
 
-  // Global Keyboard Listener for Cheat Codes, Weapon Cycle (Q/E), & Radio (R)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -298,7 +296,9 @@ export function App() {
         return;
       }
 
-      if (e.code === 'KeyQ') {
+      if (e.code === 'KeyM') {
+        setFullMapOpen((prev) => !prev);
+      } else if (e.code === 'KeyQ') {
         setWeaponIdx((prev) => (prev - 1 + weapons.length) % weapons.length);
       } else if (e.code === 'KeyE') {
         setWeaponIdx((prev) => (prev + 1) % weapons.length);
@@ -322,7 +322,6 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [executeCheat, weapons.length]);
 
-  // Game Clock Progression (1 GTA minute = 1 real second unless locked by OFVIAC)
   useEffect(() => {
     if (clockLocked) return;
     const id = window.setInterval(() => {
@@ -346,7 +345,6 @@ export function App() {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-black select-none">
-      {/* 3D WebGL2 World Canvas */}
       <SanAndreasWorldCanvas
         gameHour={gameHour}
         weather={weather}
@@ -374,7 +372,6 @@ export function App() {
         onTelemetry={setTelemetry}
       />
 
-      {/* Authentic GTA:SA HUD & Rotating Radar */}
       <GtaHud
         telemetry={telemetry}
         gameHour={gameHour}
@@ -399,6 +396,8 @@ export function App() {
         onQuickSwitchGraphicsMode={handleQuickSwitchGraphicsMode}
         activeDrawer={activeDrawer}
         onSetActiveDrawer={setActiveDrawer}
+        onOpenFullMap={() => setFullMapOpen(true)}
+        customWaypoint={customWaypoint}
         currentStation={GTA_SA_RADIO_STATIONS[stationIdx]}
         onCycleRadio={() => {
           const next = (stationIdx + 1) % GTA_SA_RADIO_STATIONS.length;
@@ -416,7 +415,6 @@ export function App() {
         }
       />
 
-      {/* Studio Engineering, Graphics Tuner, Cheat Deck, Spawner & REA Binary Lab Drawers */}
       <StudioDrawers
         activeDrawer={activeDrawer}
         onClose={() => setActiveDrawer('NONE')}
@@ -435,6 +433,17 @@ export function App() {
         onExecuteCheat={executeCheat}
         onStartMission={(missionId) =>
           setMissionStartRequest({ missionId, nonce: Date.now() })
+        }
+      />
+
+      <FullScreenMapModal
+        isOpen={fullMapOpen}
+        onClose={() => setFullMapOpen(false)}
+        telemetry={telemetry}
+        customWaypoint={customWaypoint}
+        onSetCustomWaypoint={setCustomWaypoint}
+        onTeleport={(x, y, z) =>
+          setTeleportRequest({ x, y, z, nonce: Date.now() })
         }
       />
     </main>

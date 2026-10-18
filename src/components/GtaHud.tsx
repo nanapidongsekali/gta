@@ -2,21 +2,24 @@ import React from 'react';
 import {
   Crosshair,
   Radio,
-  Shield,
   Sparkles,
   Star,
   Volume2,
   VolumeX,
-  Wrench,
   Cpu,
   Terminal,
   Car,
   Compass,
   Zap,
+  Map,
 } from 'lucide-react';
 import { TelemetrySnapshot, WeaponSlot } from './SanAndreasWorldCanvas';
 import { GraphicsModeId } from '../engine/TimeCycle';
 import { RadioStationInfo } from '../engine/AudioEngine';
+import {
+  SAN_ANDREAS_ROAD_NETWORK,
+  worldToCanonicalSaCoords,
+} from '../engine/SanAndreasMapData';
 
 interface Props {
   telemetry: TelemetrySnapshot;
@@ -46,6 +49,8 @@ interface Props {
   onSetActiveDrawer: (
     drawer: 'NONE' | 'GRAPHICS' | 'CHEATS' | 'VEHICLES' | 'MISSIONS' | 'STUDIO_REA'
   ) => void;
+  onOpenFullMap: () => void;
+  customWaypoint: [number, number] | null;
   currentStation: RadioStationInfo;
   onCycleRadio: () => void;
   muted: boolean;
@@ -73,21 +78,24 @@ export const GtaHud: React.FC<Props> = ({
   onQuickSwitchGraphicsMode,
   activeDrawer,
   onSetActiveDrawer,
+  onOpenFullMap,
+  customWaypoint,
   currentStation,
   onCycleRadio,
   muted,
   onToggleMute,
   onTriggerAction,
 }) => {
-  // Format 24h GTA:SA Clock (HH:MM) with tabular-nums
   const hours = Math.floor(((gameHour % 24) + 24) % 24);
   const minutes = Math.floor((gameHour % 1) * 60);
   const clockStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-
-  // Format 8-digit zero-padded GTA:SA cash ($00000350)
   const cashStr = `$${String(Math.max(0, Math.floor(cash))).padStart(8, '0')}`;
+  const saCoords = worldToCanonicalSaCoords(
+    telemetry.playerX,
+    telemetry.playerY,
+    telemetry.playerZ
+  );
 
-  // Format mission objective text (convert GTA GXT color tags ~y~, ~g~, ~p~, ~b~, ~w~)
   const renderGxtFormattedText = (raw: string) => {
     const parts = raw.split(/(~[ygpbwr]~)/g);
     let currentColor = 'text-zinc-100';
@@ -126,11 +134,9 @@ export const GtaHud: React.FC<Props> = ({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-4 sm:p-6">
-      {/* TOP BAR: Left Cheat Help Box + Studio Toolbar | Right Authentic GTA:SA Vital HUD */}
+      {/* TOP BAR */}
       <div className="flex items-start justify-between gap-4">
-        {/* Top-Left Column: Studio Navigation Dock + Authentic GTA:SA Help/Cheat Box */}
-        <div className="flex flex-col gap-3 max-w-xl">
-          {/* Studio Engineering & Graphics Tuner Dock (Concentric radii: outer rounded-2xl p-1.5 -> inner rounded-xl) */}
+        <div className="flex flex-col gap-3 max-w-2xl">
           <div
             className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-2xl bg-zinc-950/85 p-1.5 backdrop-blur-md"
             style={{
@@ -138,6 +144,15 @@ export const GtaHud: React.FC<Props> = ({
                 '0 12px 32px -4px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1)',
             }}
           >
+            <button
+              type="button"
+              onClick={onOpenFullMap}
+              className="flex min-h-[40px] items-center gap-2 rounded-xl bg-emerald-500/20 border border-emerald-400/40 px-3.5 py-2 text-xs font-bold text-emerald-300 transition-[transform,background-color] duration-150 hover:bg-emerald-500/30 active:scale-[0.96]"
+            >
+              <Map className="h-4 w-4 stroke-[2]" />
+              <span>Full Map [M]</span>
+            </button>
+
             <button
               type="button"
               onClick={() =>
@@ -212,7 +227,7 @@ export const GtaHud: React.FC<Props> = ({
               }`}
             >
               <Cpu className="h-4 w-4 stroke-[2]" />
-              <span>Studio & REA Binary Lab</span>
+              <span>Studio & REA Lab</span>
             </button>
 
             <button
@@ -229,7 +244,6 @@ export const GtaHud: React.FC<Props> = ({
             </button>
           </div>
 
-          {/* Live Render Pipeline Quick-Compare Switcher */}
           <div
             className="pointer-events-auto inline-flex self-start items-center gap-1 rounded-xl bg-zinc-950/80 p-1 backdrop-blur-md"
             style={{
@@ -261,7 +275,6 @@ export const GtaHud: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Authentic GTA:SA Top-Left Black Help / "Cheat activated" Box (CHud::DrawHelpText @ 0x58B6E0) */}
           {cheatToast && (
             <div
               className="w-72 rounded-lg bg-black/85 px-4 py-3 text-zinc-100"
@@ -278,7 +291,6 @@ export const GtaHud: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Active Mission Objective Banner */}
           {telemetry.activeMission && (
             <div
               className="max-w-md rounded-xl bg-zinc-950/85 px-4 py-3 backdrop-blur-md"
@@ -304,7 +316,7 @@ export const GtaHud: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Top-Right Column: Authentic GTA San Andreas HUD (Weapon Icon, Clock, Health, Armor, Cash, 6 Wanted Stars) */}
+        {/* Top-Right Vital HUD */}
         <div
           className="pointer-events-auto flex flex-col items-end gap-2 rounded-2xl bg-zinc-950/75 p-3.5 backdrop-blur-md"
           style={{
@@ -313,7 +325,6 @@ export const GtaHud: React.FC<Props> = ({
           }}
         >
           <div className="flex items-center gap-3.5">
-            {/* Weapon Box (Click to cycle weapon) */}
             <button
               type="button"
               onClick={() => onCycleWeapon(1)}
@@ -331,9 +342,7 @@ export const GtaHud: React.FC<Props> = ({
               </span>
             </button>
 
-            {/* Clock + Armor & Health Bars */}
             <div className="flex flex-col items-end gap-1.5">
-              {/* GTA:SA Pricedown Clock */}
               <div
                 className="font-pricedown text-3xl font-black tracking-wider text-zinc-100 [font-variant-numeric:tabular-nums]"
                 style={{
@@ -344,7 +353,6 @@ export const GtaHud: React.FC<Props> = ({
                 {clockStr}
               </div>
 
-              {/* White/Silver Armor Bar */}
               <div className="h-3 w-36 overflow-hidden rounded-sm border-2 border-black bg-zinc-800">
                 <div
                   className="h-full bg-zinc-100 transition-[width] duration-150"
@@ -352,7 +360,6 @@ export const GtaHud: React.FC<Props> = ({
                 />
               </div>
 
-              {/* Red Health Bar */}
               <div className="h-3.5 w-36 overflow-hidden rounded-sm border-2 border-black bg-red-950">
                 <div
                   className="h-full bg-red-600 transition-[width] duration-150"
@@ -362,7 +369,6 @@ export const GtaHud: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 8-Digit Green Cash Counter ($00000350) */}
           <div
             className="font-pricedown text-3xl font-black tracking-wider text-[#36882c] [font-variant-numeric:tabular-nums]"
             style={{
@@ -373,7 +379,6 @@ export const GtaHud: React.FC<Props> = ({
             {cashStr}
           </div>
 
-          {/* 6-Star Wanted Level Row */}
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5, 6].map((starIdx) => {
               const active = starIdx <= wantedStars && !neverWanted;
@@ -390,7 +395,6 @@ export const GtaHud: React.FC<Props> = ({
             })}
           </div>
 
-          {/* Active Status Pills (Respect, Muscle, Jetpack, God Mode, FPS) */}
           <div className="mt-0.5 flex flex-wrap items-center justify-end gap-1.5 text-[11px] font-semibold [font-variant-numeric:tabular-nums]">
             <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-emerald-300">
               Respect {respect}/1000
@@ -418,7 +422,7 @@ export const GtaHud: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* CENTER OVERLAY: Mission Passed / Wasted / Resprayed / Gang War Banner */}
+      {/* CENTER OVERLAY */}
       {banner && (
         <div className="pointer-events-none flex flex-col items-center justify-center text-center">
           <div
@@ -447,24 +451,26 @@ export const GtaHud: React.FC<Props> = ({
         </div>
       )}
 
-      {/* BOTTOM BAR: Rotating Circular Radar (Left) | Subtitles & Controls (Center) | Vehicle Speedometer & District Name (Right) */}
+      {/* BOTTOM BAR */}
       <div className="flex items-end justify-between gap-4">
-        {/* Bottom-Left: Authentic GTA:SA Circular Radar Minimap with Gang Turf Overlay */}
+        {/* Bottom-Left: Authentic Rotating Cartographic Radar (CRadar::DrawRadarMap @ 0x586880) */}
         <div className="flex items-end gap-3">
           <div
-            className={`relative h-40 w-40 sm:h-44 sm:w-44 rounded-full border-4 ${
+            onClick={onOpenFullMap}
+            title="Click to open Full-Screen San Andreas Map [M]"
+            className={`pointer-events-auto cursor-pointer relative h-44 w-44 sm:h-48 sm:w-48 rounded-full border-4 ${
               telemetry.gangWarActive
                 ? 'border-red-500 animate-pulse'
                 : 'border-zinc-900'
-            } bg-zinc-900/90 overflow-hidden`}
+            } bg-[#1c2b21] overflow-hidden transition-[transform] duration-150 active:scale-[0.96]`}
             style={{
               boxShadow:
-                '0 12px 32px rgba(0,0,0,0.85), inset 0 0 24px rgba(0,0,0,0.75), 0 0 0 2px rgba(255,255,255,0.18)',
+                '0 12px 32px rgba(0,0,0,0.85), inset 0 0 24px rgba(0,0,0,0.75), 0 0 0 2px rgba(255,255,255,0.22)',
             }}
           >
             {/* Gang Territory Color Tint */}
             <div
-              className="absolute inset-0 opacity-30"
+              className="absolute inset-0 opacity-30 pointer-events-none"
               style={{
                 background:
                   telemetry.controllingGang === 'GROVE'
@@ -477,23 +483,89 @@ export const GtaHud: React.FC<Props> = ({
               }}
             />
 
-            {/* Rotating Radar Street Grid & Blips */}
-            <div
-              className="absolute inset-0"
+            {/* Real-Time Rotating Vector Cartography centered on CJ */}
+            <svg
+              viewBox={`${telemetry.playerX - 135} ${telemetry.playerZ - 135} 270 270`}
+              className="absolute inset-0 h-full w-full"
               style={{
                 transform: `rotate(${(telemetry.headingRad * 180) / Math.PI}deg)`,
               }}
             >
-              {/* Cul-de-Sac & Road Crosshairs on Radar */}
-              <div className="absolute left-1/2 top-0 bottom-0 w-2 -translate-x-1/2 bg-zinc-600/50" />
-              <div className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 bg-zinc-600/50" />
-              <div className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-400/40" />
+              {/* Glen Park Pond on Radar */}
+              <circle cx={45} cy={-115} r={22} fill="#0284c7" />
 
-              {/* World Blips relative to CJ */}
+              {/* Roads, Freeways, Storm Drain Canal & Rail */}
+              {SAN_ANDREAS_ROAD_NETWORK.map((road) => {
+                const pointsAttr = road.points
+                  .map(([px, pz]) => `${px},${pz}`)
+                  .join(' ');
+                const strokeColor =
+                  road.kind === 'canal'
+                    ? '#0284c7'
+                    : road.kind === 'freeway'
+                    ? '#eab308'
+                    : road.kind === 'rail'
+                    ? '#a16207'
+                    : '#71717a';
+                return (
+                  <polyline
+                    key={road.id}
+                    points={pointsAttr}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth={road.width * 0.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                );
+              })}
+
+              {/* Iconic East-Facing Grove Street Cul-de-Sac Ring at (28, 0) */}
+              <circle
+                cx={28}
+                cy={0}
+                r={18}
+                fill="#3f3f46"
+                stroke="#22c55e"
+                strokeWidth="3.5"
+              />
+              <circle cx={28} cy={0} r={6.5} fill="#15803d" />
+
+              {/* Custom GPS Waypoint Line */}
+              {customWaypoint && (
+                <g>
+                  <line
+                    x1={telemetry.playerX}
+                    y1={telemetry.playerZ}
+                    x2={customWaypoint[0]}
+                    y2={customWaypoint[1]}
+                    stroke="#ef4444"
+                    strokeWidth="4"
+                    strokeDasharray="7 5"
+                  />
+                  <circle
+                    cx={customWaypoint[0]}
+                    cy={customWaypoint[1]}
+                    r={9}
+                    fill="#ef4444"
+                    stroke="#000"
+                    strokeWidth="3"
+                  />
+                </g>
+              )}
+            </svg>
+
+            {/* Clamped Edge & Interior Blips */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                transform: `rotate(${(telemetry.headingRad * 180) / Math.PI}deg)`,
+              }}
+            >
               {telemetry.blips.map((b) => {
-                const dx = (b.x - telemetry.playerX) * 0.48;
-                const dz = (b.z - telemetry.playerZ) * 0.48;
-                const clampedDist = Math.min(72, Math.hypot(dx, dz));
+                const dx = (b.x - telemetry.playerX) * 0.55;
+                const dz = (b.z - telemetry.playerZ) * 0.55;
+                const clampedDist = Math.min(76, Math.hypot(dx, dz));
                 const angle = Math.atan2(dx, -dz);
                 const rx = Math.sin(angle) * clampedDist;
                 const ry = -Math.cos(angle) * clampedDist;
@@ -535,13 +607,13 @@ export const GtaHud: React.FC<Props> = ({
               />
             </div>
 
-            {/* Bottom Coordinates Readout */}
-            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] text-zinc-300 [font-variant-numeric:tabular-nums]">
-              {telemetry.playerX}, {telemetry.playerZ}
+            {/* Canonical GTA:SA Coordinates Readout */}
+            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded bg-black/80 px-2 py-0.5 font-mono text-[9px] text-emerald-300 [font-variant-numeric:tabular-nums]">
+              SA {saCoords[0]}, {saCoords[1]}
             </div>
           </div>
 
-          {/* Quick Action Tactile Controls for Desktop/Touch */}
+          {/* Quick Action Tactile Controls */}
           <div className="pointer-events-auto hidden md:flex flex-col gap-1.5">
             {telemetry.nearVehicleName && !telemetry.inVehicle && (
               <button
@@ -606,34 +678,33 @@ export const GtaHud: React.FC<Props> = ({
             }}
           >
             <span>
-              <strong className="text-white">WASD / Arrows</strong> Move & Drive
+              <strong className="text-white">WASD</strong> Move/Drive
             </span>
             <span>•</span>
             <span>
-              <strong className="text-white">F / Enter</strong> Vehicle
+              <strong className="text-emerald-400">M</strong> Full Map & GPS
             </span>
             <span>•</span>
             <span>
-              <strong className="text-white">Space</strong> Jump / Handbrake / Ascend
+              <strong className="text-white">F</strong> Enter/Exit Car
             </span>
             <span>•</span>
             <span>
-              <strong className="text-white">Shift</strong> Sprint / 10x Nitro
+              <strong className="text-white">Space</strong> Jump/Handbrake
             </span>
             <span>•</span>
             <span>
-              <strong className="text-white">Ctrl</strong> Shoot / Spray Tag
+              <strong className="text-white">Shift</strong> Sprint/Nitro
             </span>
             <span>•</span>
             <span>
-              <strong className="text-amber-400">Type HESOYAM / ROCKETMAN</strong> Cheats
+              <strong className="text-amber-400">Type HESOYAM</strong> Cheats
             </span>
           </div>
         </div>
 
-        {/* Bottom-Right: Authentic GTA:SA Vehicle Name, Radio Station, Speedometer & Zone Name (CHud::DrawAreaName @ 0x58AA50) */}
+        {/* Bottom-Right: Radio, Speedometer & Zone Callout */}
         <div className="flex flex-col items-end gap-2 text-right">
-          {/* Radio Station Selector Pill */}
           <button
             type="button"
             onClick={onCycleRadio}
@@ -659,7 +730,6 @@ export const GtaHud: React.FC<Props> = ({
             </div>
           </button>
 
-          {/* Vehicle Telemetry & Speedometer */}
           {telemetry.inVehicle && (
             <div
               className="rounded-xl bg-zinc-950/85 px-4 py-2.5 backdrop-blur-md"
@@ -682,7 +752,6 @@ export const GtaHud: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Iconic GTA:SA Zone / District Callout */}
           <div className="pr-1">
             <div
               className="font-diploma text-2xl sm:text-3xl font-bold tracking-wide text-amber-300"

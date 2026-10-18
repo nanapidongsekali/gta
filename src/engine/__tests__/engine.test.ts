@@ -20,8 +20,22 @@ import {
   SAMPLE_LAE_IPL,
 } from '../BinaryFormats';
 import { REA_RECONSTRUCTION_LEDGER } from '../StudioLedger';
+import {
+  SAN_ANDREAS_BOOKMARKS,
+  SAN_ANDREAS_ROAD_NETWORK,
+  SAN_ANDREAS_ZONE_POLYGONS,
+  worldToCanonicalSaCoords,
+} from '../SanAndreasMapData';
 
 describe('OpenSA Reverse-Engineered GTA:SA Engine Conformance', () => {
+  it('maps Grove Street Cul-de-Sac and 14 San Andreas regions to canonical [-3000..+3000] Rockstar coordinates', () => {
+    const [saX, saY] = worldToCanonicalSaCoords(0, 0, 0);
+    expect(saX).toBe(2495);
+    expect(saY).toBe(-1668);
+    expect(SAN_ANDREAS_BOOKMARKS.length).toBe(14);
+    expect(SAN_ANDREAS_ZONE_POLYGONS.length).toBeGreaterThanOrEqual(13);
+    expect(SAN_ANDREAS_ROAD_NETWORK.length).toBeGreaterThanOrEqual(10);
+  });
   it('reproduces exact gta_sa.exe v1.0 US JamCRC cheat hashes (0x4384D0 / 0x53CF00)', () => {
     expect(computeGtaSaCheatJamCrc('HESOYAM')).toBe(0xeeccea2b);
     expect(computeGtaSaCheatJamCrc('LXGIWYL')).toBe(0xde4b237d);

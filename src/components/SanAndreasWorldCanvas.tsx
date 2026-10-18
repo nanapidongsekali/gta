@@ -171,7 +171,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep latest props in refs for the 60FPS requestAnimationFrame loop
   const stateRef = useRef({
     gameHour,
     weather,
@@ -265,13 +264,13 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
 
     // 1. Setup Scene, Camera & WebGL2 Renderer
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0xd89b68, 0.0022);
+    scene.fog = new THREE.FogExp2(0xd89b68, 0.0018);
 
     const camera = new THREE.PerspectiveCamera(
       66,
       container.clientWidth / Math.max(1, container.clientHeight),
       0.5,
-      1800
+      2200
     );
 
     const renderer = new THREE.WebGLRenderer({
@@ -287,7 +286,7 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    // 2. Procedural Environment Cube/Equirect Texture for PBR Vehicle Clearcoat Reflections
+    // 2. Procedural Environment Map for PBR Vehicle Clearcoat Reflections
     const envCanvas = document.createElement('canvas');
     envCanvas.width = 256;
     envCanvas.height = 128;
@@ -316,8 +315,8 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 520;
-    const d = 165;
+    sunLight.shadow.camera.far = 560;
+    const d = 180;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
@@ -326,12 +325,12 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     scene.add(sunLight);
 
     const sunDisc = new THREE.Mesh(
-      new THREE.SphereGeometry(18, 24, 24),
+      new THREE.SphereGeometry(20, 24, 24),
       new THREE.MeshBasicMaterial({ color: 0xffb74d })
     );
     scene.add(sunDisc);
 
-    // 4. Procedural Asphalt & Sidewalk Textures
+    // 4. Procedural Asphalt & Concrete Textures
     const makeAsphaltTexture = () => {
       const c = document.createElement('canvas');
       c.width = 256;
@@ -344,7 +343,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         ctx.fillStyle = `rgb(${v},${v},${v + 2})`;
         ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
       }
-      // Dashed yellow center lines
       ctx.fillStyle = '#eab308';
       for (let y = 0; y < 256; y += 32) {
         ctx.fillRect(126, y, 4, 18);
@@ -363,8 +361,9 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       metalness: 0.18,
     });
 
-    // 5. Ground Terrain, Roads, Grove Street Cul-de-Sac & Landmarks
-    const groundGeo = new THREE.PlaneGeometry(1400, 1400);
+    // 5. Multi-Biome San Andreas Terrain:
+    // - Main Los Santos & Countryside Grass Terrain
+    const groundGeo = new THREE.PlaneGeometry(1600, 1600);
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x3b4d32,
       roughness: 0.92,
@@ -375,43 +374,29 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Main Grove Street Road leading into the Cul-de-Sac (Z: -25 to +260)
-    const groveRoad = new THREE.Mesh(
-      new THREE.PlaneGeometry(20, 320),
+    // - Bone County & Las Venturas Desert Sand Biome (North-East X: 110..560, Z: -480..-170)
+    const desertBiome = new THREE.Mesh(
+      new THREE.PlaneGeometry(460, 320),
+      new THREE.MeshStandardMaterial({ color: 0x85633e, roughness: 0.92 })
+    );
+    desertBiome.rotation.x = -Math.PI / 2;
+    desertBiome.position.set(330, 0.02, -320);
+    desertBiome.receiveShadow = true;
+    scene.add(desertBiome);
+
+    // 6. Authentic Grove Street Topology (LAe.ipl Orientation):
+    // Grove Street runs West-to-East (X: -145 to +28 along Z = 0) into the East-Facing Cul-de-Sac at (28, 0, 0)!
+    const groveStreetRoad = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 175),
       roadMaterial
     );
-    groveRoad.rotation.x = -Math.PI / 2;
-    groveRoad.position.set(0, 0.04, 135);
-    groveRoad.receiveShadow = true;
-    scene.add(groveRoad);
+    groveStreetRoad.rotation.x = -Math.PI / 2;
+    groveStreetRoad.rotation.z = Math.PI / 2;
+    groveStreetRoad.position.set(-58, 0.05, 0);
+    groveStreetRoad.receiveShadow = true;
+    scene.add(groveStreetRoad);
 
-    // Cross streets (Idlewood Blvd, Glen Park Ave, Downtown Fwy)
-    const crossRoadZCoords = [55, 145, -80];
-    crossRoadZCoords.forEach((zPos) => {
-      const ewRoad = new THREE.Mesh(
-        new THREE.PlaneGeometry(680, 20),
-        roadMaterial
-      );
-      ewRoad.rotation.x = -Math.PI / 2;
-      ewRoad.rotation.z = Math.PI / 2;
-      ewRoad.position.set(0, 0.05, zPos);
-      ewRoad.receiveShadow = true;
-      scene.add(ewRoad);
-    });
-
-    // North-South Avenues (Downtown / Glen Park)
-    [-145, 115].forEach((xPos) => {
-      const nsRoad = new THREE.Mesh(
-        new THREE.PlaneGeometry(20, 680),
-        roadMaterial
-      );
-      nsRoad.rotation.x = -Math.PI / 2;
-      nsRoad.position.set(xPos, 0.05, 0);
-      nsRoad.receiveShadow = true;
-      scene.add(nsRoad);
-    });
-
-    // Iconic Grove Street Circular Cul-de-Sac at (0, 0.06, -24)
+    // East-Facing Grove Street Cul-de-Sac Circle at (28, 0.06, 0)
     const culDeSacPavement = new THREE.Mesh(
       new THREE.CircleGeometry(28, 48),
       new THREE.MeshStandardMaterial({
@@ -421,18 +406,78 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       })
     );
     culDeSacPavement.rotation.x = -Math.PI / 2;
-    culDeSacPavement.position.set(0, 0.06, -24);
+    culDeSacPavement.position.set(28, 0.06, 0);
     culDeSacPavement.receiveShadow = true;
     scene.add(culDeSacPavement);
 
-    // Center island in the Cul-de-Sac
+    // Center Grassy Island inside the Cul-de-Sac at (28, 0.12, 0)
     const culDeSacIsland = new THREE.Mesh(
       new THREE.CylinderGeometry(8.5, 9, 0.25, 32),
       new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.85 })
     );
-    culDeSacIsland.position.set(0, 0.12, -24);
+    culDeSacIsland.position.set(28, 0.12, 0);
     culDeSacIsland.receiveShadow = true;
     scene.add(culDeSacIsland);
+
+    // North-South Avenues: Liverpool Rd / Ganton (-32), Downtown (-145), East Beach (185), Las Venturas Strip (365)
+    [-145, -32, 185, 365].forEach((xPos) => {
+      const nsRoad = new THREE.Mesh(
+        new THREE.PlaneGeometry(20, 680),
+        roadMaterial
+      );
+      nsRoad.rotation.x = -Math.PI / 2;
+      nsRoad.position.set(xPos, 0.04, -30);
+      nsRoad.receiveShadow = true;
+      scene.add(nsRoad);
+    });
+
+    // East-West Arterials: Idlewood Blvd (Z=145), Glen Park Blvd (Z=-115), Mulholland/Interstate (Z=-245), LSIA Hwy (Z=285)
+    [-245, -115, 145, 285].forEach((zPos) => {
+      const ewRoad = new THREE.Mesh(
+        new THREE.PlaneGeometry(860, 20),
+        roadMaterial
+      );
+      ewRoad.rotation.x = -Math.PI / 2;
+      ewRoad.rotation.z = Math.PI / 2;
+      ewRoad.position.set(-20, 0.04, zPos);
+      ewRoad.receiveShadow = true;
+      scene.add(ewRoad);
+    });
+
+    // 7. Los Santos Concrete Storm Drain / Flood Control Channel (Directly East of Grove St Cul-de-Sac at X = 76)
+    const canalGroup = new THREE.Group();
+    const canalFloor = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 420),
+      new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.8 })
+    );
+    canalFloor.rotation.x = -Math.PI / 2;
+    canalFloor.position.set(76, 0.04, -10);
+    canalGroup.add(canalFloor);
+
+    // Central drainage water stream inside Storm Drain
+    const canalWater = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.5, 420),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x0284c7,
+        roughness: 0.15,
+        clearcoat: 1.0,
+      })
+    );
+    canalWater.rotation.x = -Math.PI / 2;
+    canalWater.position.set(76, 0.08, -10);
+    canalGroup.add(canalWater);
+
+    // Sloped concrete walls on West & East banks of Storm Drain
+    [-11, 11].forEach((offsetX, i) => {
+      const bank = new THREE.Mesh(
+        new THREE.BoxGeometry(5.5, 0.4, 420),
+        new THREE.MeshStandardMaterial({ color: 0x71717a, roughness: 0.85 })
+      );
+      bank.position.set(76 + offsetX, 1.1, -10);
+      bank.rotation.z = i === 0 ? 0.42 : -0.42;
+      canalGroup.add(bank);
+    });
+    scene.add(canalGroup);
 
     // Helper: Build Palm Tree
     const createPalmTree = (x: number, z: number, height = 14) => {
@@ -470,23 +515,26 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       scene.add(tree);
     };
 
-    // Place Palm Trees around Grove Street & Los Santos
     const palmCoords: Array<[number, number, number]> = [
-      [0, -24, 16],
-      [-14, -42, 15],
-      [15, -42, 14],
-      [-24, -8, 15],
-      [24, -8, 16],
-      [-15, 22, 14],
-      [15, 22, 15],
-      [135, 18, 14],
-      [155, -12, 15],
-      [-185, 175, 16],
-      [-210, 195, 16],
+      [28, 0, 16],     // Center of Grove St Cul-de-Sac!
+      [48, -14, 15],
+      [48, 14, 15],
+      [8, -22, 15],
+      [8, 22, 16],
+      [-18, -14, 14],
+      [-18, 14, 15],
+      [45, -102, 14],  // Glen Park
+      [62, -125, 15],
+      [-265, 195, 16], // Santa Maria Beach
+      [-285, 225, 16],
+      [352, -310, 15], // Las Venturas Strip Palms
+      [378, -310, 15],
+      [352, -340, 15],
+      [378, -340, 15],
     ];
     palmCoords.forEach(([px, pz, ph]) => createPalmTree(px, pz, ph));
 
-    // Helper: Build House / Landmark Building
+    // Helper: Build House
     const buildHouse = (
       x: number,
       z: number,
@@ -517,7 +565,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       roof.castShadow = true;
       g.add(roof);
 
-      // Windows
       const winMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
       const win1 = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.4), winMat);
       win1.position.set(-w * 0.25, h * 0.55, d / 2 + 0.05);
@@ -526,7 +573,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       win2.position.set(w * 0.25, h * 0.55, d / 2 + 0.05);
       g.add(win2);
 
-      // Door
       const door = new THREE.Mesh(
         new THREE.PlaneGeometry(1.4, 2.5),
         new THREE.MeshStandardMaterial({ color: 0x451a03 })
@@ -548,33 +594,36 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       scene.add(g);
     };
 
-    // Iconic Grove Street Houses:
-    // 1. CJ's Johnson House (North-center of Cul-de-Sac)
-    buildHouse(0, -56, 13, 8.2, 11, 0xd6cfc2, 0x3f3f46, 0, true);
-    // 2. Sweet's House (East side of Cul-de-Sac)
-    buildHouse(34, -26, 11, 5.5, 10, 0x84a98c, 0x374151, -Math.PI / 2, true);
-    // 3. Ryder's House (West side of Cul-de-Sac)
-    buildHouse(-34, -26, 11, 5.5, 10, 0xb5a895, 0x4b5563, Math.PI / 2, true);
-    // 4. Big Smoke's House & Neighboring Grove St Homes
-    buildHouse(34, 8, 12, 6.8, 10, 0xe2e8f0, 0x334155, -Math.PI / 2);
-    buildHouse(-34, 8, 11, 5.8, 10, 0x9ca3af, 0x3f3f46, Math.PI / 2);
-    buildHouse(-22, -52, 10, 5.5, 9, 0xa8a29e, 0x27272a, 0.35);
-    buildHouse(22, -52, 10, 5.5, 9, 0x94a3b8, 0x27272a, -0.35);
+    // Iconic Grove Street Cul-de-Sac Houses (True LAe.ipl Ring around (28, 0, 0)):
+    // 1. CJ's Johnson House (East/South-East of Cul-de-Sac facing West into circle)
+    buildHouse(56, 6, 13, 8.4, 11, 0xd6cfc2, 0x3f3f46, -Math.PI / 2, true);
+    // 2. Sweet's House (South side of Cul-de-Sac facing North)
+    buildHouse(28, 32, 11, 5.6, 10, 0x84a98c, 0x374151, Math.PI, true);
+    // 3. Ryder's House (North-West side of Cul-de-Sac facing South)
+    buildHouse(24, -32, 11, 5.6, 10, 0xb5a895, 0x4b5563, 0, true);
+    // 4. Neighboring Cul-de-Sac & Grove Street Homes
+    buildHouse(48, -24, 11, 6.0, 10, 0xe2e8f0, 0x334155, -0.6);
+    buildHouse(6, 28, 11, 5.8, 10, 0x9ca3af, 0x3f3f46, Math.PI);
+    buildHouse(-12, -22, 11, 5.8, 10, 0xa8a29e, 0x27272a, 0);
+    buildHouse(-12, 22, 11, 5.8, 10, 0x94a3b8, 0x27272a, Math.PI);
 
-    // Ganton Highway Bridge Overpass over Grove Street (Z = 55)
+    // Ganton Gym & Basketball Court at (-48, 0, 18)
+    buildHouse(-48, 24, 16, 6.5, 12, 0x3f6212, 0x18181b, Math.PI);
+
+    // Ganton Overpass Bridge (Liverpool Rd spanning North-South over Grove St at X = -32)
     const bridgeDeck = new THREE.Mesh(
-      new THREE.BoxGeometry(46, 1.4, 14),
+      new THREE.BoxGeometry(14, 1.4, 48),
       new THREE.MeshStandardMaterial({ color: 0x71717a, roughness: 0.85 })
     );
-    bridgeDeck.position.set(0, 8.5, 55);
+    bridgeDeck.position.set(-32, 8.2, 0);
     bridgeDeck.castShadow = true;
     scene.add(bridgeDeck);
-    [-16, 16].forEach((bx) => {
+    [-16, 16].forEach((bz) => {
       const pillar = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.1, 1.1, 8.5, 12),
+        new THREE.CylinderGeometry(1.1, 1.1, 8.2, 12),
         new THREE.MeshStandardMaterial({ color: 0x52525b })
       );
-      pillar.position.set(bx, 4.25, 55);
+      pillar.position.set(-32, 4.1, bz);
       pillar.castShadow = true;
       scene.add(pillar);
     });
@@ -608,7 +657,7 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     pnsGroup.position.set(-48, 0, 162);
     scene.add(pnsGroup);
 
-    // Cluckin' Bell Idlewood at (58, 0, 165)
+    // Willowfield Cluckin' Bell Drive-Thru at (55, 0, 165)
     const cbGroup = new THREE.Group();
     const cbBuilding = new THREE.Mesh(
       new THREE.BoxGeometry(18, 7, 14),
@@ -632,9 +681,12 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     cbGroup.position.set(62, 0, 178);
     scene.add(cbGroup);
 
-    // Glen Park Pond & Bridge at (155, 0, 10)
+    // Unity Station (El Corona Lowrider Meet Depot) at (-125, 0, 95)
+    buildHouse(-125, 112, 28, 8.5, 14, 0xd97706, 0x7c2d12, Math.PI, true);
+
+    // Glen Park Pond & Bridge at (45, 0, -115)
     const glenPond = new THREE.Mesh(
-      new THREE.CircleGeometry(26, 36),
+      new THREE.CircleGeometry(24, 36),
       new THREE.MeshPhysicalMaterial({
         color: 0x0284c7,
         roughness: 0.12,
@@ -643,21 +695,12 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       })
     );
     glenPond.rotation.x = -Math.PI / 2;
-    glenPond.position.set(158, 0.08, 12);
+    glenPond.position.set(45, 0.08, -115);
     scene.add(glenPond);
 
-    // Los Santos Storm Drain Canal at X = 82
-    const canalFloor = new THREE.Mesh(
-      new THREE.PlaneGeometry(18, 460),
-      new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.85 })
-    );
-    canalFloor.rotation.x = -Math.PI / 2;
-    canalFloor.position.set(82, 0.03, 20);
-    scene.add(canalFloor);
-
-    // Downtown Los Santos Skyscrapers & U.S. Bank Tower (Maze Bank / LS Tower) at (-175, 0, -45)
+    // Downtown Los Santos Skyscrapers & U.S. Bank Tower at (-175, 0, -65)
     const lsTower = new THREE.Mesh(
-      new THREE.CylinderGeometry(16, 19, 135, 24),
+      new THREE.CylinderGeometry(16, 19, 138, 24),
       new THREE.MeshPhysicalMaterial({
         color: 0x64748b,
         metalness: 0.75,
@@ -665,7 +708,7 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         clearcoat: 0.8,
       })
     );
-    lsTower.position.set(-175, 67.5, -45);
+    lsTower.position.set(-175, 69, -65);
     lsTower.castShadow = true;
     lsTower.receiveShadow = true;
     scene.add(lsTower);
@@ -674,15 +717,14 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       new THREE.CylinderGeometry(11, 14, 14, 20),
       new THREE.MeshBasicMaterial({ color: 0xfef08a })
     );
-    towerCrown.position.set(-175, 138, -45);
+    towerCrown.position.set(-175, 140, -65);
     scene.add(towerCrown);
 
-    // Additional Downtown Skyscrapers
     const skyscraperSpecs = [
-      { x: -195, z: 15, w: 24, h: 78, d: 24, c: 0x334155 },
-      { x: -135, z: -25, w: 22, h: 64, d: 22, c: 0x475569 },
-      { x: -215, z: -65, w: 26, h: 92, d: 24, c: 0x1e293b },
-      { x: -145, z: 35, w: 20, h: 54, d: 20, c: 0x3f3f46 },
+      { x: -195, z: -5, w: 24, h: 78, d: 24, c: 0x334155 },
+      { x: -135, z: -45, w: 22, h: 64, d: 22, c: 0x475569 },
+      { x: -215, z: -85, w: 26, h: 92, d: 24, c: 0x1e293b },
+      { x: -165, z: 25, w: 20, h: 54, d: 20, c: 0x3f3f46 },
     ];
     skyscraperSpecs.forEach((s) => {
       const b = new THREE.Mesh(
@@ -698,12 +740,12 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       scene.add(b);
     });
 
-    // Vinewood Hills & Giant White "VINEWOOD" Sign at (0, 26, -240)
+    // Vinewood Hills & Giant White "VINEWOOD" Sign at (-65, 38, -235)
     const hillMesh = new THREE.Mesh(
-      new THREE.ConeGeometry(165, 55, 8),
+      new THREE.ConeGeometry(165, 58, 8),
       new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.95 })
     );
-    hillMesh.position.set(0, 22, -265);
+    hillMesh.position.set(-65, 24, -275);
     scene.add(hillMesh);
 
     const makeVinewoodSign = () => {
@@ -726,14 +768,23 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           side: THREE.DoubleSide,
         })
       );
-      signMesh.position.set(0, 38, -205);
+      signMesh.position.set(-65, 42, -215);
       scene.add(signMesh);
     };
     makeVinewoodSign();
 
-    // Santa Maria Beach Ocean & Pier at (-240, 0.1, 230)
+    // LSIA Airport Runway at (-100, 0.06, 295)
+    const runwayMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(240, 34),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 })
+    );
+    runwayMesh.rotation.x = -Math.PI / 2;
+    runwayMesh.position.set(-95, 0.06, 295);
+    scene.add(runwayMesh);
+
+    // Santa Maria Beach Ocean, Pier & Lighthouse at (-285, 0.1, 210)
     const oceanMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(340, 340),
+      new THREE.PlaneGeometry(380, 420),
       new THREE.MeshPhysicalMaterial({
         color: 0x0369a1,
         roughness: 0.15,
@@ -742,10 +793,74 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       })
     );
     oceanMesh.rotation.x = -Math.PI / 2;
-    oceanMesh.position.set(-280, 0.08, 250);
+    oceanMesh.position.set(-380, 0.08, 220);
     scene.add(oceanMesh);
 
-    // 6. Collectible Ballas Graffiti Tags to Spray Over ("Tagging Up Turf")
+    const lighthouse = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.5, 4.2, 28, 16),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc })
+    );
+    lighthouse.position.set(-285, 14, 225);
+    lighthouse.castShadow = true;
+    scene.add(lighthouse);
+
+    // San Fierro Gant Bridge (Red Golden Gate Suspension Towers) & Mount Chiliad at (-420, 0, -260)
+    [-445, -395].forEach((tx) => {
+      const tower = new THREE.Mesh(
+        new THREE.BoxGeometry(6, 75, 16),
+        new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.5 })
+      );
+      tower.position.set(tx, 37.5, -260);
+      tower.castShadow = true;
+      scene.add(tower);
+    });
+    const gantDeck = new THREE.Mesh(
+      new THREE.BoxGeometry(110, 2.2, 20),
+      new THREE.MeshStandardMaterial({ color: 0x991b1b })
+    );
+    gantDeck.position.set(-420, 18, -260);
+    scene.add(gantDeck);
+
+    // Mount Chiliad Peak at (-460, 0, -110)
+    const chiliadMesh = new THREE.Mesh(
+      new THREE.ConeGeometry(140, 115, 7),
+      new THREE.MeshStandardMaterial({ color: 0x3f3f46, roughness: 0.95 })
+    );
+    chiliadMesh.position.set(-460, 55, -110);
+    scene.add(chiliadMesh);
+
+    // Bone County Area 69 Restricted Military Base at (215, 0, -340)
+    const area69Bunker = new THREE.Mesh(
+      new THREE.BoxGeometry(36, 8, 26),
+      new THREE.MeshStandardMaterial({ color: 0x57534e })
+    );
+    area69Bunker.position.set(215, 4, -340);
+    scene.add(area69Bunker);
+
+    // Las Venturas — The Strip (Camel's Toe Pyramid & Four Dragons Casino) at (365, 0, -320)
+    const lvPyramid = new THREE.Mesh(
+      new THREE.ConeGeometry(38, 48, 4),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x18181b,
+        metalness: 0.85,
+        roughness: 0.15,
+        clearcoat: 1.0,
+      })
+    );
+    lvPyramid.position.set(405, 24, -320);
+    lvPyramid.rotation.y = Math.PI / 4;
+    lvPyramid.castShadow = true;
+    scene.add(lvPyramid);
+
+    const fourDragons = new THREE.Mesh(
+      new THREE.BoxGeometry(28, 46, 24),
+      new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.4 })
+    );
+    fourDragons.position.set(325, 23, -320);
+    fourDragons.castShadow = true;
+    scene.add(fourDragons);
+
+    // 8. Collectible Ballas Graffiti Tags to Spray Over ("Tagging Up Turf")
     const makeTagTexture = (sprayed: boolean) => {
       const c = document.createElement('canvas');
       c.width = 256;
@@ -769,11 +884,11 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     };
 
     const tagLocations: Array<[number, number]> = [
-      [-15, 48],
-      [-52, 12],
+      [10, -14],
+      [-32, 12],
       [48, 142],
-      [128, 32],
-      [25, 92],
+      [45, -108],
+      [-15, 92],
       [-85, 62],
     ];
     const graffitiTags: GraffitiTagInstance[] = tagLocations.map(([tx, tz], idx) => {
@@ -781,7 +896,10 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         map: makeTagTexture(false),
         side: THREE.DoubleSide,
       });
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(5.2, 3.2, 0.5), new THREE.MeshStandardMaterial({ color: 0x52525b }));
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(5.2, 3.2, 0.5),
+        new THREE.MeshStandardMaterial({ color: 0x52525b })
+      );
       wall.position.set(tx, 1.6, tz);
       wall.castShadow = true;
       scene.add(wall);
@@ -800,10 +918,10 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       };
     });
 
-    // 7. Build Playable Character CJ (Carl Johnson)
+    // 9. Build Playable Character CJ (Carl Johnson)
     const cjGroup = new THREE.Group();
     const cjSkinMat = new THREE.MeshStandardMaterial({ color: 0x6f452b, roughness: 0.65 });
-    const cjHoodieMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7 }); // Grove Street Green
+    const cjHoodieMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7 });
     const cjJeansMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.85 });
 
     const cjTorso = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.15, 0.48), cjHoodieMat);
@@ -816,7 +934,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     cjHead.castShadow = true;
     cjGroup.add(cjHead);
 
-    // Green bandana cap
     const cjBandana = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.16, 0.58), cjHoodieMat);
     cjBandana.position.y = 2.58;
     cjGroup.add(cjBandana);
@@ -840,7 +957,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     cjRightArm.rotation.x = -0.45;
     cjGroup.add(cjRightArm);
 
-    // Weapon in CJ's right hand
     const cjWeaponMesh = new THREE.Mesh(
       new THREE.BoxGeometry(0.14, 0.18, 0.65),
       new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.8, roughness: 0.2 })
@@ -848,7 +964,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     cjWeaponMesh.position.set(0.58, 1.45, 0.55);
     cjGroup.add(cjWeaponMesh);
 
-    // Black Project Jetpack on CJ's back
     const jetpackGroup = new THREE.Group();
     const jpCylinderL = new THREE.Mesh(
       new THREE.CylinderGeometry(0.16, 0.16, 0.95, 12),
@@ -869,11 +984,11 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     jetpackGroup.visible = false;
     cjGroup.add(jetpackGroup);
 
-    // Start CJ in Grove Street Cul-de-Sac right outside the Johnson House
-    cjGroup.position.set(0, 0, -34);
+    // Start CJ in the East-facing Grove Street Cul-de-Sac outside the Johnson House (40, 0, 4) facing West (-Math.PI/2)
+    cjGroup.position.set(40, 0, 4);
     scene.add(cjGroup);
 
-    // 8. Build Vehicle Factory (Authentic GTA:SA Vehicles with PBR Clearcoat & Custom Geometry)
+    // 10. Build Vehicle Factory
     const vehicles: SpawnedVehicleInstance[] = [];
 
     const createVehicleInstance = (
@@ -918,7 +1033,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       let turretGroup: THREE.Object3D | undefined;
 
       if (handling.category === 'bicycle' || handling.category === 'bike') {
-        // 2-Wheel BMX or Motorcycle (NRG-500 / Sanchez)
         const isBicycle = handling.category === 'bicycle';
         bodyMesh = new THREE.Mesh(
           new THREE.BoxGeometry(isBicycle ? 0.32 : 0.65, isBicycle ? 0.75 : 0.9, isBicycle ? 1.85 : 2.3),
@@ -928,7 +1042,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         bodyMesh.castShadow = true;
         group.add(bodyMesh);
 
-        // Handlebars
         const bars = new THREE.Mesh(
           new THREE.CylinderGeometry(0.05, 0.05, 0.95, 8),
           secondaryMat
@@ -947,7 +1060,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           wheels.push(w);
         });
       } else if (handling.identifier === 'RHINO') {
-        // M1A1 Rhino Tank
         bodyMesh = new THREE.Mesh(
           new THREE.BoxGeometry(3.6, 1.45, 6.4),
           bodyMaterial
@@ -972,7 +1084,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         turretGroup.add(cannon);
         group.add(turretGroup);
       } else if (handling.identifier === 'MAVERICK') {
-        // Helicopter
         bodyMesh = new THREE.Mesh(
           new THREE.BoxGeometry(2.2, 1.8, 4.6),
           bodyMaterial
@@ -995,7 +1106,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         rotorMain.position.set(0, 2.55, 0);
         group.add(rotorMain);
       } else if (handling.identifier === 'HYDRA') {
-        // Hydra VTOL Fighter Jet
         bodyMesh = new THREE.Mesh(
           new THREE.ConeGeometry(1.35, 8.2, 6),
           bodyMaterial
@@ -1012,7 +1122,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         wings.position.set(0, 1.35, -0.5);
         group.add(wings);
       } else {
-        // Standard 4-Wheel Sedan / Lowrider / Supercar / Police Cruiser
         const isSupercar = handling.category === 'supercar';
         const chassisH = isSupercar ? 0.68 : 0.86;
         bodyMesh = new THREE.Mesh(
@@ -1024,7 +1133,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         bodyMesh.receiveShadow = true;
         group.add(bodyMesh);
 
-        // Cabin / Roof
         const cabin = new THREE.Mesh(
           new THREE.BoxGeometry(1.92, isSupercar ? 0.55 : 0.72, 2.35),
           handling.category === 'lowrider' ? secondaryMat : bodyMaterial
@@ -1033,7 +1141,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         cabin.castShadow = true;
         group.add(cabin);
 
-        // Windshield
         const windshield = new THREE.Mesh(
           new THREE.PlaneGeometry(1.78, 0.62),
           glassMat
@@ -1042,7 +1149,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         windshield.rotation.x = -0.35;
         group.add(windshield);
 
-        // Headlights & Taillights
         const hlMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
         const tlMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
         [-0.78, 0.78].forEach((lx) => {
@@ -1054,7 +1160,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           group.add(tl);
         });
 
-        // Police Siren Bar
         if (handling.hasSiren) {
           const barL = new THREE.Mesh(
             new THREE.BoxGeometry(0.55, 0.18, 0.28),
@@ -1077,7 +1182,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           group.add(sirenLightR);
         }
 
-        // 4 Wheels
         const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.32, 16);
         wheelGeo.rotateZ(Math.PI / 2);
         const wheelMat = new THREE.MeshStandardMaterial({
@@ -1098,7 +1202,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         });
       }
 
-      // Nitrous Oxide Flame Cone (hidden unless boosting)
       const nitroFlame = new THREE.Mesh(
         new THREE.ConeGeometry(0.32, 1.4, 10),
         new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
@@ -1136,20 +1239,22 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       return inst;
     };
 
-    // Spawn Iconic Grove Street & Los Santos Vehicles
-    createVehicleInstance('BMX', -6, -30, 0.4);               // BMX right outside CJ's house!
-    createVehicleInstance('GREENWOOD', 18, -24, 0);          // Sweet's Greenwood
-    createVehicleInstance('PICADOR', -19, -24, 0);           // Ryder's Picador
-    createVehicleInstance('SAVANNA', -12, -12, 0.25);        // Cesar's Lowrider Savanna
-    createVehicleInstance('SULTAN', 12, 16, 0);              // Sultan Tuner
-    createVehicleInstance('INFERNUS', -14, 42, 0);           // Infernus Supercar
-    createVehicleInstance('NRG500', 8, -14, -0.3);           // NRG-500 Superbike
-    createVehicleInstance('SANCHEZ', 78, 12, 0);             // Sanchez Dirtbike by Storm Drain
-    createVehicleInstance('COPCARLA', -32, 85, 1.57);        // LSPD Cruiser
-    createVehicleInstance('TAXI', 25, 65, -1.57);            // Los Santos Taxi
-    createVehicleInstance('MAVERICK', -150, -45, 0);         // Maverick Helicopter near LS Tower
+    // Spawn Vehicles in Authentic Grove Street Cul-de-Sac & Landmark Positions
+    createVehicleInstance('BMX', 36, -4, -Math.PI / 2);         // BMX right outside CJ's house in Cul-de-Sac
+    createVehicleInstance('GREENWOOD', 26, 20, -Math.PI / 2);   // Sweet's Greenwood in front of Sweet's House
+    createVehicleInstance('PICADOR', 22, -20, -Math.PI / 2);    // Ryder's Picador in front of Ryder's House
+    createVehicleInstance('SAVANNA', 12, 8, -Math.PI / 2);      // Cesar's Lowrider Savanna
+    createVehicleInstance('SULTAN', -12, -6, Math.PI / 2);      // Sultan Tuner on Grove Street
+    createVehicleInstance('INFERNUS', 365, -305, 0);            // Infernus Supercar on Las Venturas Strip
+    createVehicleInstance('NRG500', 42, -8, -Math.PI / 2);      // NRG-500 Superbike
+    createVehicleInstance('SANCHEZ', 74, -20, 0);               // Sanchez Dirtbike inside Storm Drain Canal!
+    createVehicleInstance('COPCARLA', -32, 85, 0);              // LSPD Cruiser
+    createVehicleInstance('TAXI', -32, -45, 0);                 // Los Santos Taxi
+    createVehicleInstance('MAVERICK', -150, -65, 0);            // Maverick Helicopter near Downtown LS Tower
+    createVehicleInstance('HYDRA', -120, 295, Math.PI / 2);     // Hydra VTOL Jet on LSIA Runway
+    createVehicleInstance('RHINO', 215, -315, 0);               // Rhino Tank at Area 69
 
-    // 9. Spawn Grove Street Families, Ballas Gang Members, & Pedestrians
+    // 11. Spawn Grove Street Families, Ballas Gang Members, & Pedestrians
     const npcs: NpcInstance[] = [];
     const spawnNpc = (
       faction: NpcInstance['faction'],
@@ -1207,26 +1312,20 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       return inst;
     };
 
-    // Grove Street Families homies on the block
-    spawnNpc('GROVE', 12, -28);
-    spawnNpc('GROVE', -10, -20);
-    spawnNpc('GROVE', 6, -8);
+    spawnNpc('GROVE', 32, 12);
+    spawnNpc('GROVE', 18, -8);
+    spawnNpc('GROVE', 4, 6);
 
-    // Ballas gang members in Idlewood & Glen Park
-    spawnNpc('BALLAS', 18, 115);
     spawnNpc('BALLAS', -12, 128);
-    spawnNpc('BALLAS', 132, 18);
-    spawnNpc('BALLAS', 142, -8);
+    spawnNpc('BALLAS', 18, 115);
+    spawnNpc('BALLAS', 45, -102);
+    spawnNpc('BALLAS', 55, -122);
     spawnNpc('BALLAS', 45, 138);
 
-    // Civilians
     spawnNpc('CIV', -25, 48);
-    spawnNpc('CIV', 28, 62);
+    spawnNpc('CIV', -145, -25);
 
-    // 10. Mission Red Glowing Cylinder Markers
-    const missionMarkerGroup = new THREE.Group();
-    scene.add(missionMarkerGroup);
-
+    // 12. Mission Red Glowing Cylinder Marker (Outside Sweet's House at (22, 0, 14))
     const activeMissionMarker = new THREE.Mesh(
       new THREE.CylinderGeometry(2.8, 2.8, 3.8, 28, 1, true),
       new THREE.MeshBasicMaterial({
@@ -1236,12 +1335,12 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         side: THREE.DoubleSide,
       })
     );
-    activeMissionMarker.position.set(24, 1.9, -14);
+    activeMissionMarker.position.set(22, 1.9, 14);
     scene.add(activeMissionMarker);
 
-    // 11. Interactive Input & Physics State
+    // 13. Input & Physics State
     const keys: Record<string, boolean> = {};
-    let playerHeading = 0;
+    let playerHeading = -Math.PI / 2; // Facing West out of the Grove St Cul-de-Sac
     let playerVelY = 0;
     let isGrounded = true;
     let walkCycle = 0;
@@ -1252,7 +1351,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     let lastMouseX = 0;
     let lastMouseY = 0;
 
-    // Mission & Gang War State
     let activeMission: MissionDefinition | null = null;
     let activeStageIndex = 0;
     let subtitle: { speaker: string; text: string } | null = null;
@@ -1313,10 +1411,8 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
-    // Core Gameplay Actions
     const toggleEnterExitVehicle = () => {
       if (currentVehicle) {
-        // Exit vehicle
         const exitX =
           currentVehicle.group.position.x -
           Math.cos(currentVehicle.heading) * 3.1;
@@ -1330,7 +1426,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         return;
       }
 
-      // Find nearest vehicle within 7.5 meters
       let best: SpawnedVehicleInstance | null = null;
       let bestDist = 7.5;
       for (const v of vehicles) {
@@ -1370,7 +1465,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         Math.cos(heading)
       ).normalize();
 
-      // Visual muzzle tracer flash
       const tracerEnd = origin.clone().addScaledVector(forward, wep.range);
       const lineGeo = new THREE.BufferGeometry().setFromPoints([origin, tracerEnd]);
       const lineMat = new THREE.LineBasicMaterial({
@@ -1384,7 +1478,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         lineMat.dispose();
       }, 95);
 
-      // Check Graffiti Tag Spraying
       for (const tag of graffitiTags) {
         if (!tag.sprayed) {
           const dist = Math.hypot(origin.x - tag.x, origin.z - tag.z);
@@ -1406,7 +1499,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         }
       }
 
-      // Check NPC hit detection
       for (const npc of npcs) {
         if (!npc.alive) continue;
         const toNpc = npc.group.position.clone().sub(origin);
@@ -1435,7 +1527,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
                     title: 'GANG WAR PROVOKED!',
                     subtitle: 'Eliminate the Ballas wave to claim Idlewood & Glen Park turf!',
                   });
-                  // Spawn wave of Ballas
                   for (let w = 0; w < 3; w++) {
                     spawnNpc(
                       'BALLAS',
@@ -1504,7 +1595,7 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         1.9,
         firstStage.targetPosition[2]
       );
-      activeMissionMarker.material.color.setHex(0xfacc15); // Yellow mission destination marker
+      activeMissionMarker.material.color.setHex(0xfacc15);
     };
 
     actionsRef.current = {
@@ -1516,7 +1607,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       triggerHydraulics,
     };
 
-    // 12. Resize Handler
     const handleResize = () => {
       if (!container) return;
       camera.aspect = container.clientWidth / Math.max(1, container.clientHeight);
@@ -1525,7 +1615,7 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     };
     window.addEventListener('resize', handleResize);
 
-    // 13. Main 60Hz Render & Simulation Loop (CGame::Process @ 0x53BEE0)
+    // 14. Main 60Hz Loop
     let animFrameId = 0;
     let lastTime = performance.now();
     let frameCounter = 0;
@@ -1548,7 +1638,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
 
       const st = stateRef.current;
 
-      // A. Update TimeCycle Sky, Fog, Sun & PBR Tuning
       const tc = interpolateTimeCycle(st.gameHour, st.weather, st.tuning);
       const skyColor = new THREE.Color(
         tc.skyBottom[0] / 255,
@@ -1558,7 +1647,7 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       scene.background = skyColor;
       if (scene.fog instanceof THREE.FogExp2) {
         scene.fog.color.copy(skyColor);
-        scene.fog.density = 1.65 / Math.max(180, tc.farClip);
+        scene.fog.density = 1.45 / Math.max(180, tc.farClip);
       }
 
       ambientLight.color.setRGB(
@@ -1585,7 +1674,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         tc.sunCore[2] / 255
       );
 
-      // Update Wet Road Reflections & Vehicle Clearcoat from Graphics Tuner
       roadMaterial.roughness = Math.max(
         0.06,
         0.65 - st.tuning.roadWetnessReflections * 0.58
@@ -1596,7 +1684,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         camera.updateProjectionMatrix();
       }
 
-      // B. Player / Vehicle Controls & Physics
       const moveForward = keys['KeyW'] || keys['ArrowUp'];
       const moveBackward = keys['KeyS'] || keys['ArrowDown'];
       const turnLeft = keys['KeyA'] || keys['ArrowLeft'];
@@ -1609,7 +1696,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         const maxSpeedUnits = (h.fMaxVelocity / 3.6) * 0.85;
         const accel = h.fEngineAcceleration * 1.45;
 
-        // Nitrous Oxide
         const nitroActive =
           boostOrSprint && (h.hasNitro || st.allCarsNitro);
         if (currentVehicle.nitroFlame) {
@@ -1627,7 +1713,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
             currentVehicle.speed - accel * 1.2 * dt
           );
         } else {
-          // Rolling & aerodynamic drag
           currentVehicle.speed *= Math.pow(0.35, dt);
           if (Math.abs(currentVehicle.speed) < 0.15) currentVehicle.speed = 0;
         }
@@ -1636,11 +1721,10 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           currentVehicle.speed *= Math.pow(0.04, dt);
         }
 
-        // Steering
         const steerFactor =
           Math.min(1, Math.abs(currentVehicle.speed) / 4) *
           (currentVehicle.speed >= 0 ? 1 : -1);
-        const turnRate = (h.fSteeringLock * Math.PI) / 180 * 1.35;
+        const turnRate = ((h.fSteeringLock * Math.PI) / 180) * 1.35;
         if (turnLeft) {
           currentVehicle.heading += turnRate * steerFactor * dt;
           currentVehicle.group.rotation.z = THREE.MathUtils.lerp(
@@ -1663,7 +1747,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           );
         }
 
-        // Aircraft / RIPAZHA Flying Cars Physics
         const canFly = h.category === 'aircraft' || st.carsFly;
         if (canFly && (jumpOrBrake || Math.abs(currentVehicle.speed) > 16)) {
           if (jumpOrBrake) {
@@ -1684,7 +1767,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           );
         }
 
-        // Lowrider Hydraulics Spring Physics
         if (currentVehicle.hydraulicBounceVel !== 0 || currentVehicle.hydraulicOffset > 0) {
           currentVehicle.hydraulicOffset += currentVehicle.hydraulicBounceVel * dt;
           currentVehicle.hydraulicBounceVel -= 26 * dt;
@@ -1696,14 +1778,12 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
             0.72 + currentVehicle.hydraulicOffset * 0.45;
         }
 
-        // Integrate Vehicle Position
         currentVehicle.group.position.x +=
           Math.sin(currentVehicle.heading) * currentVehicle.speed * dt;
         currentVehicle.group.position.z +=
           Math.cos(currentVehicle.heading) * currentVehicle.speed * dt;
         currentVehicle.group.rotation.y = currentVehicle.heading;
 
-        // Spin Wheels & Helicopter Rotors
         const vehSpeed = currentVehicle.speed;
         currentVehicle.wheels.forEach((w) => {
           w.rotation.x += vehSpeed * dt * 1.8;
@@ -1712,11 +1792,9 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           currentVehicle.rotorMain.rotation.y += dt * 18;
         }
 
-        // Sync CJ position to vehicle
         cjGroup.position.copy(currentVehicle.group.position);
         playerHeading = currentVehicle.heading;
       } else {
-        // On-Foot or Jetpack Controls
         jetpackGroup.visible = st.jetpackActive;
         const speed = boostOrSprint ? 15.5 : 9.2;
 
@@ -1731,7 +1809,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         cjGroup.position.z += Math.cos(playerHeading) * moveAmount * dt;
         cjGroup.rotation.y = playerHeading;
 
-        // Jetpack Levitation or Jump
         if (st.jetpackActive) {
           if (jumpOrBrake) {
             cjGroup.position.y = Math.min(165, cjGroup.position.y + 18 * dt);
@@ -1754,7 +1831,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
           }
         }
 
-        // Limb Swing Animation
         if (Math.abs(moveAmount) > 0.1) {
           walkCycle += dt * (boostOrSprint ? 14 : 9);
           cjLeftLeg.rotation.x = Math.sin(walkCycle) * 0.65;
@@ -1767,7 +1843,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         }
       }
 
-      // C. Check Pay 'n' Spray Garage Trigger at (-48, 0, 151)
       const activePos = currentVehicle
         ? currentVehicle.group.position
         : cjGroup.position;
@@ -1794,11 +1869,9 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         });
       }
 
-      // D. Update Mission State Machine (CRunningScript)
       activeMissionMarker.rotation.y += dt * 1.8;
       if (!activeMission) {
-        // Check if player stepped into Sweet's default mission marker at (24, 0, -14)
-        const distToStart = Math.hypot(activePos.x - 24, activePos.z - -14);
+        const distToStart = Math.hypot(activePos.x - 22, activePos.z - 14);
         if (distToStart < 4.5) {
           startMissionById(GTA_SA_MISSIONS[0].id);
         }
@@ -1821,12 +1894,11 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
               );
               audioEngine.playCheatActivated();
             } else {
-              // Mission Passed!
               const completed = activeMission;
               activeMission = null;
               activeStageIndex = 0;
               subtitle = null;
-              activeMissionMarker.position.set(24, 1.9, -14);
+              activeMissionMarker.position.set(22, 1.9, 14);
               activeMissionMarker.material.color.setHex(0xef4444);
               audioEngine.playMissionPassedFanfare();
               onUpdateStats((prev) => ({
@@ -1844,11 +1916,9 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         }
       }
 
-      // E. Update NPCs & LSPD Wanted Pursuit AI
       for (const npc of npcs) {
         if (!npc.alive) continue;
         if (npc.faction === 'BALLAS' && gangWarActive) {
-          // Move toward CJ
           const dx = activePos.x - npc.group.position.x;
           const dz = activePos.z - npc.group.position.z;
           npc.walkAngle = Math.atan2(dx, dz);
@@ -1862,7 +1932,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         npc.rightLeg.rotation.x = -Math.sin(now * 0.008) * 0.5;
       }
 
-      // Flash police sirens & update PBR clearcoat on all vehicles
       const sirenFlash = Math.floor(now / 180) % 2 === 0;
       for (const v of vehicles) {
         v.bodyMaterial.clearcoat = st.tuning.pbrClearcoatIntensity;
@@ -1872,7 +1941,6 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         }
       }
 
-      // F. Update 3rd-Person Chase Camera
       const camDist = currentVehicle
         ? currentVehicle.handling.category === 'aircraft' ||
           currentVehicle.handling.identifier === 'RHINO'
@@ -1901,10 +1969,8 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         activePos.z
       );
 
-      // G. Render Scene
       renderer.render(scene, camera);
 
-      // H. Emit Telemetry at 15Hz to HUD & Radar
       telemetryTimer += dt;
       if (telemetryTimer >= 0.066) {
         telemetryTimer = 0;
@@ -1923,10 +1989,10 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         const blips: WorldEntityBlip[] = [
           {
             id: 'BLIP_CJ_HOUSE',
-            x: 0,
-            z: -48,
+            x: 52,
+            z: 6,
             type: 'mission',
-            label: 'CJ House (Grove St)',
+            label: 'CJ House (Grove St Cul-de-Sac)',
             color: '#22c55e',
             code: 'CJ',
           },
