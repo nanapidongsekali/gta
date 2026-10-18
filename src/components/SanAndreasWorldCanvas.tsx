@@ -14,6 +14,12 @@ import {
   MissionDefinition,
   getZoneAtPosition,
 } from '../engine/MissionScripts';
+import {
+  loadRealGtaSaDataBundle,
+  resolveRockstarTextureTint,
+  type ParsedDffMesh,
+  type CarColSwatch,
+} from '../engine/RealGtaFileLoader';
 import { audioEngine } from '../engine/AudioEngine';
 
 export interface WeaponSlot {
@@ -535,6 +541,9 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
     palmCoords.forEach(([px, pz, ph]) => createPalmTree(px, pz, ph));
 
     // Helper: Build House
+    const fallbackGroveGroup = new THREE.Group();
+    scene.add(fallbackGroveGroup);
+
     const buildHouse = (
       x: number,
       z: number,
@@ -544,7 +553,8 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       wallColor: number,
       roofColor: number,
       rotY = 0,
-      hasPorch = false
+      hasPorch = false,
+      targetParent: THREE.Object3D = scene
     ) => {
       const g = new THREE.Group();
       const body = new THREE.Mesh(
@@ -591,24 +601,170 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
 
       g.position.set(x, 0, z);
       g.rotation.y = rotY;
-      scene.add(g);
+      targetParent.add(g);
     };
 
-    // Iconic Grove Street Cul-de-Sac Houses (True LAe.ipl Ring around (28, 0, 0)):
+    // Iconic Grove Street Cul-de-Sac Houses (Fallback until Real .DFF Binary Meshes finish loading):
     // 1. CJ's Johnson House (East/South-East of Cul-de-Sac facing West into circle)
-    buildHouse(56, 6, 13, 8.4, 11, 0xd6cfc2, 0x3f3f46, -Math.PI / 2, true);
+    buildHouse(56, 6, 13, 8.4, 11, 0xd6cfc2, 0x3f3f46, -Math.PI / 2, true, fallbackGroveGroup);
     // 2. Sweet's House (South side of Cul-de-Sac facing North)
-    buildHouse(28, 32, 11, 5.6, 10, 0x84a98c, 0x374151, Math.PI, true);
+    buildHouse(28, 32, 11, 5.6, 10, 0x84a98c, 0x374151, Math.PI, true, fallbackGroveGroup);
     // 3. Ryder's House (North-West side of Cul-de-Sac facing South)
-    buildHouse(24, -32, 11, 5.6, 10, 0xb5a895, 0x4b5563, 0, true);
+    buildHouse(24, -32, 11, 5.6, 10, 0xb5a895, 0x4b5563, 0, true, fallbackGroveGroup);
     // 4. Neighboring Cul-de-Sac & Grove Street Homes
-    buildHouse(48, -24, 11, 6.0, 10, 0xe2e8f0, 0x334155, -0.6);
+    buildHouse(48, -24, 11, 6.0, 10, 0xe2e8f0, 0x334155, -0.6, false, fallbackGroveGroup);
     buildHouse(6, 28, 11, 5.8, 10, 0x9ca3af, 0x3f3f46, Math.PI);
     buildHouse(-12, -22, 11, 5.8, 10, 0xa8a29e, 0x27272a, 0);
     buildHouse(-12, 22, 11, 5.8, 10, 0x94a3b8, 0x27272a, Math.PI);
 
     // Ganton Gym & Basketball Court at (-48, 0, 18)
-    buildHouse(-48, 24, 16, 6.5, 12, 0x3f6212, 0x18181b, Math.PI);
+    buildHouse(-48, 24, 16, 6.5, 12, 0x3f6212, 0x18181b, Math.PI, false, fallbackGroveGroup);
+
+    // Real RenderWare .DFF Binary Mesh Builder (RpClumpStreamRead @ 0x74B420)
+    const realDffGroup = new THREE.Group();
+    scene.add(realDffGroup);
+    let loadedCarcolsPalette: CarColSwatch[] = [];
+
+    const buildThreeMeshFromParsedDff = (
+      dff: ParsedDffMesh,
+      x: number,
+      z: number,
+      rotY: number
+    ) => {
+      const triCount = dff.triangles.length;
+      if (triCount === 0) return;
+
+      const posArr = new Float32Array(triCount * 9);
+      const colArr = new Float32Array(triCount * 9);
+      const minZ = dff.localBounds.min.z;
+
+      for (let t = 0; t < triCount; t++) {
+        const [v1, v2, v3, matId] = dff.triangles[t];
+        const texName = dff.materials[matId]?.textureName || '';
+        const [tr, tg, tb] = resolveRockstarTextureTint(texName);
+        const verts = [v1, v2, v3];
+
+        for (let k = 0; k < 3; k++) {
+          const vi = verts[k];
+          const gx = dff.positions[vi * 3];
+          const gy = dff.positions[vi * 3 + 1];
+          const gz = dff.positions[vi * 3 + 2];
+
+          const outIdx = t * 9 + k * 3;
+          posArr[outIdx] = gx;
+          posArr[outIdx + 1] = gz - minZ;
+          posArr[outIdx + 2] = -gy;
+
+          let pr = 0.85,
+            pg = 0.85,
+            pb = 0.85;
+          if (dff.prelitColors) {
+            pr = 0.45 + 0.65 * (dff.prelitColors[vi * 4] / 255);
+            pg = 0.45 + 0.65 * (dff.prelitColors[vi * 4 + 1] / 255);
+            pb = 0.45 + 0.65 * (dff.prelitColors[vi * 4 + 2] / 255);
+          }
+          colArr[outIdx] = Math.min(1, tr * pr);
+          colArr[outIdx + 1] = Math.min(1, tg * pg);
+          colArr[outIdx + 2] = Math.min(1, tb * pb);
+        }
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+      geo.computeVertexNormals();
+
+      const mesh = new THREE.Mesh(
+        geo,
+        new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.78,
+          metalness: 0.08,
+          side: THREE.DoubleSide,
+        })
+      );
+      mesh.position.set(x, 0, z);
+      mesh.rotation.y = rotY;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      realDffGroup.add(mesh);
+    };
+
+    loadRealGtaSaDataBundle().then((bundle) => {
+      loadedCarcolsPalette = bundle.carcols.palette;
+      const dffs = bundle.dffMeshes;
+      if (dffs['carlshou1_lae2.dff']) {
+        fallbackGroveGroup.visible = false;
+        // Instantiate real Rockstar .DFF buildings around Grove Street & Ganton
+        buildThreeMeshFromParsedDff(dffs['carlshou1_lae2.dff'], 56, 6, -Math.PI / 2);
+        if (dffs['cjsaveg.dff']) {
+          buildThreeMeshFromParsedDff(dffs['cjsaveg.dff'], 56, -7, -Math.PI / 2);
+        }
+        if (dffs['cjgaragedoor.dff']) {
+          buildThreeMeshFromParsedDff(dffs['cjgaragedoor.dff'], 52, -7, -Math.PI / 2);
+        }
+        if (dffs['sweetshou1_lae2.dff']) {
+          buildThreeMeshFromParsedDff(dffs['sweetshou1_lae2.dff'], 28, 32, Math.PI);
+        }
+        if (dffs['rydhou01_lae2.dff']) {
+          buildThreeMeshFromParsedDff(dffs['rydhou01_lae2.dff'], 24, -32, 0);
+        }
+        if (dffs['mcstraps_lae2.dff']) {
+          buildThreeMeshFromParsedDff(dffs['mcstraps_lae2.dff'], 48, -24, -0.6);
+        }
+        if (dffs['scumgym1_lae.dff']) {
+          buildThreeMeshFromParsedDff(dffs['scumgym1_lae.dff'], -48, 28, Math.PI);
+        }
+        if (dffs['barberblock1_lae.dff']) {
+          buildThreeMeshFromParsedDff(dffs['barberblock1_lae.dff'], -48, -28, 0);
+        }
+        if (dffs['cluckinbell1_lae.dff']) {
+          buildThreeMeshFromParsedDff(dffs['cluckinbell1_lae.dff'], 62, 178, Math.PI);
+        }
+      }
+    });
+
+    // Authentic Glowing Yellow ENEX Interior Portals (CEntryExitManager @ 0x43FA50)
+    const enexPortals: Array<{
+      id: string;
+      name: string;
+      x: number;
+      z: number;
+      cone: THREE.Mesh;
+      ring: THREE.Mesh;
+    }> = [];
+    const enexDefs = [
+      { id: 'CARLS', name: 'JOHNSON HOUSE (CARLS ENEX)', x: 45, z: 6 },
+      { id: 'GYM1', name: 'GANTON GYM (GYM1 ENEX)', x: -48, z: 14 },
+      { id: 'CSCHP', name: "BINCO & OLD REECE'S (CSCHP ENEX)", x: -48, z: -14 },
+      { id: 'FDCHICK', name: "CLUCKIN' BELL (FDCHICK ENEX)", x: 52, z: 168 },
+    ];
+    enexDefs.forEach((ed) => {
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.85, 1.65, 16),
+        new THREE.MeshBasicMaterial({
+          color: 0xfacc15,
+          transparent: true,
+          opacity: 0.88,
+        })
+      );
+      cone.rotation.x = Math.PI; // Pointing downward like GTA:SA ENEX marker
+      cone.position.set(ed.x, 1.35, ed.z);
+      scene.add(cone);
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.45, 24),
+        new THREE.MeshBasicMaterial({
+          color: 0xfde047,
+          side: THREE.DoubleSide,
+        })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(ed.x, 0.08, ed.z);
+      scene.add(ring);
+
+      enexPortals.push({ ...ed, cone, ring });
+    });
 
     // Ganton Overpass Bridge (Liverpool Rd spanning North-South over Grove St at X = -32)
     const bridgeDeck = new THREE.Mesh(
@@ -1846,14 +2002,83 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
       const activePos = currentVehicle
         ? currentVehicle.group.position
         : cjGroup.position;
+
+      // Animate & Check ENEX Interior Portals (CEntryExitManager::Update @ 0x440D10)
+      for (const ep of enexPortals) {
+        ep.cone.rotation.y += dt * 2.5;
+        ep.cone.position.y = 1.35 + Math.sin(now * 0.004 + ep.x) * 0.22;
+        if (!currentVehicle && Math.hypot(activePos.x - ep.x, activePos.z - ep.z) < 2.8 && now - lastResprayTime > 5000) {
+          lastResprayTime = now;
+          audioEngine.playCheatActivated();
+          if (ep.id === 'CARLS') {
+            onUpdateStats((prev) => ({
+              ...prev,
+              health: 100,
+              armor: Math.max(prev.armor, 50),
+              respect: Math.min(1000, prev.respect + 15),
+            }));
+            onBannerNotification({
+              type: 'MISSION_PASSED',
+              title: 'JOHNSON HOUSE ("CARLS")',
+              subtitle: 'Safehouse Entered — Health Restored & Game Progress Saved!',
+            });
+          } else if (ep.id === 'GYM1') {
+            onUpdateStats((prev) => ({
+              ...prev,
+              muscle: Math.min(1000, prev.muscle + 60),
+              stamina: Math.min(1000, prev.stamina + 60),
+            }));
+            onBannerNotification({
+              type: 'MISSION_PASSED',
+              title: 'GANTON GYM ("GYM1")',
+              subtitle: 'Bench Press & Treadmill Complete — MUSCLE +6% | STAMINA +6%!',
+            });
+          } else if (ep.id === 'CSCHP') {
+            onUpdateStats((prev) => ({
+              ...prev,
+              respect: Math.min(1000, prev.respect + 45),
+              wantedStars: 0,
+            }));
+            onBannerNotification({
+              type: 'RESPRAYED',
+              title: 'BINCO & OLD REECE ("CSCHP")',
+              subtitle: 'Grove Street Green Colors & Fresh Cesar Cut — RESPECT +45!',
+            });
+          } else if (ep.id === 'FDCHICK') {
+            onUpdateStats((prev) => ({
+              ...prev,
+              health: 100,
+              cash: Math.max(0, prev.cash - 10),
+            }));
+            onBannerNotification({
+              type: 'RESPRAYED',
+              title: "CLUCKIN' BELL (\"FDCHICK\")",
+              subtitle: "Cluckin' Huge Meal Ordered (-$10) — 100% Health Restored!",
+            });
+          }
+        }
+      }
+
       const distToPayNSpray = Math.hypot(activePos.x - -48, activePos.z - 151);
       if (distToPayNSpray < 7.5 && now - lastResprayTime > 6000) {
         lastResprayTime = now;
+        let colorDesc = 'Custom Candy Coat';
         if (currentVehicle) {
           currentVehicle.hp = 1000;
-          const candyColors = [0x16a34a, 0xdc2626, 0x2563eb, 0xf59e0b, 0x9333ea, 0x06b6d4];
-          const randomColor = candyColors[Math.floor(Math.random() * candyColors.length)];
-          currentVehicle.bodyMaterial.color.setHex(randomColor);
+          if (loadedCarcolsPalette.length > 0) {
+            const swatch =
+              loadedCarcolsPalette[Math.floor(Math.random() * loadedCarcolsPalette.length)];
+            currentVehicle.bodyMaterial.color.setRGB(
+              swatch.r / 255,
+              swatch.g / 255,
+              swatch.b / 255
+            );
+            colorDesc = `carcols.dat #${swatch.index} (${swatch.comment})`;
+          } else {
+            const candyColors = [0x16a34a, 0xdc2626, 0x2563eb, 0xf59e0b, 0x9333ea, 0x06b6d4];
+            const randomColor = candyColors[Math.floor(Math.random() * candyColors.length)];
+            currentVehicle.bodyMaterial.color.setHex(randomColor);
+          }
         }
         onUpdateStats((prev) => ({
           ...prev,
@@ -1864,8 +2089,8 @@ export const SanAndreasWorldCanvas: React.FC<Props> = ({
         audioEngine.playCheatActivated();
         onBannerNotification({
           type: 'RESPRAYED',
-          title: 'PAY ’N’ SPRAY',
-          subtitle: 'Engine Repaired, Custom Candy Coat Applied & Wanted Level Cleared!',
+          title: 'PAY ’N’ SPRAY (sprLAe)',
+          subtitle: `Engine Repaired, Resprayed [${colorDesc}] & Wanted Cleared!`,
         });
       }
 

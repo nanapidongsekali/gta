@@ -7,6 +7,8 @@ import {
 import { GtaHud } from './components/GtaHud';
 import { StudioDrawers } from './components/StudioDrawers';
 import { FullScreenMapModal } from './components/FullScreenMapModal';
+import { ReverseEngineeringWorkbench } from './components/ReverseEngineeringWorkbench';
+import { canonicalSaToWorldCoords } from './engine/SanAndreasMapData';
 import {
   DEFAULT_GRAPHICS_TUNING,
   GraphicsModeId,
@@ -112,6 +114,7 @@ export function App() {
     'NONE' | 'GRAPHICS' | 'CHEATS' | 'VEHICLES' | 'MISSIONS' | 'STUDIO_REA'
   >('NONE');
   const [fullMapOpen, setFullMapOpen] = useState<boolean>(false);
+  const [reWorkbenchOpen, setReWorkbenchOpen] = useState<boolean>(false);
   const [customWaypoint, setCustomWaypoint] = useState<[number, number] | null>(
     null
   );
@@ -298,6 +301,9 @@ export function App() {
 
       if (e.code === 'KeyM') {
         setFullMapOpen((prev) => !prev);
+      } else if (e.code === 'F2') {
+        e.preventDefault();
+        setReWorkbenchOpen((prev) => !prev);
       } else if (e.code === 'KeyQ') {
         setWeaponIdx((prev) => (prev - 1 + weapons.length) % weapons.length);
       } else if (e.code === 'KeyE') {
@@ -397,6 +403,7 @@ export function App() {
         activeDrawer={activeDrawer}
         onSetActiveDrawer={setActiveDrawer}
         onOpenFullMap={() => setFullMapOpen(true)}
+        onOpenReWorkbench={() => setReWorkbenchOpen(true)}
         customWaypoint={customWaypoint}
         currentStation={GTA_SA_RADIO_STATIONS[stationIdx]}
         onCycleRadio={() => {
@@ -445,6 +452,20 @@ export function App() {
         onTeleport={(x, y, z) =>
           setTeleportRequest({ x, y, z, nonce: Date.now() })
         }
+      />
+
+      <ReverseEngineeringWorkbench
+        isOpen={reWorkbenchOpen}
+        onClose={() => setReWorkbenchOpen(false)}
+        onTeleportToGtaCoords={(saX, saY, label) => {
+          const [wx, wy, wz] = canonicalSaToWorldCoords(saX, saY, 13.5);
+          setTeleportRequest({ x: wx, y: wy, z: wz, nonce: Date.now() });
+          showBanner({
+            type: 'RESPRAYED',
+            title: 'CFileLoader TELEPORT',
+            subtitle: `${label} — SA (${saX.toFixed(1)}, ${saY.toFixed(1)})`,
+          });
+        }}
       />
     </main>
   );

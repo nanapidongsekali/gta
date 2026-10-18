@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   CheatBuffer,
   computeGtaSaCheatJamCrc,
@@ -25,7 +27,17 @@ import {
   SAN_ANDREAS_ROAD_NETWORK,
   SAN_ANDREAS_ZONE_POLYGONS,
   worldToCanonicalSaCoords,
+  canonicalSaToWorldCoords,
 } from '../SanAndreasMapData';
+import {
+  parseIplText,
+  parseZonText,
+  parseIdeText,
+  parseCarcolsText,
+  parseWaterDatText,
+  parseWeaponDatText,
+  parseRenderWareDffMesh,
+} from '../RealGtaFileLoader';
 
 describe('OpenSA Reverse-Engineered GTA:SA Engine Conformance', () => {
   it('maps Grove Street Cul-de-Sac and 14 San Andreas regions to canonical [-3000..+3000] Rockstar coordinates', () => {
@@ -107,5 +119,72 @@ describe('OpenSA Reverse-Engineered GTA:SA Engine Conformance', () => {
       expect(ob.parityScore).toBeGreaterThanOrEqual(99.8);
       expect(ob.exeVirtualAddress).toMatch(/^0x00[0-9A-F]{6}$/);
     }
+  });
+
+  it('parses authentic GTA:SA LAe2.ipl & lae2_stream0..2.ipl (inst, enex, grge, cars) via CFileLoader (0x538090)', () => {
+    const dataDir = path.resolve(process.cwd(), 'public/gtasa-data');
+    const lae2Ipl = parseIplText(
+      fs.readFileSync(path.join(dataDir, 'LAe2.ipl'), 'utf8'),
+      'LAe2.ipl'
+    );
+    const stream0 = parseIplText(
+      fs.readFileSync(path.join(dataDir, 'lae2_stream0.ipl'), 'utf8'),
+      'lae2_stream0.ipl'
+    );
+    expect(lae2Ipl.instances.length).toBeGreaterThan(200);
+    expect(lae2Ipl.enexes.some((e) => e.name === 'CARLS')).toBe(true);
+    expect(lae2Ipl.enexes.some((e) => e.name === 'GYM1')).toBe(true);
+    expect(lae2Ipl.garages.some((g) => g.name === 'cjsafe')).toBe(true);
+
+    const carlsHouse = stream0.instances.find((i) => i.modelId === 17697);
+    expect(carlsHouse).toBeDefined();
+    expect(carlsHouse?.modelName).toBe('carlshou1_LAe2');
+    expect(carlsHouse?.pos.x).toBeCloseTo(2494.2656, 2);
+    expect(carlsHouse?.pos.y).toBeCloseTo(-1696.2109, 2);
+
+    const [wx, , wz] = canonicalSaToWorldCoords(2495, -1668, 13.5);
+    expect(wx).toBe(0);
+    expect(wz).toBe(0);
+  });
+
+  it('parses authentic info.zon, water.dat, vehicles.ide, carcols.dat & weapon.dat', () => {
+    const dataDir = path.resolve(process.cwd(), 'public/gtasa-data');
+    const zones = parseZonText(fs.readFileSync(path.join(dataDir, 'info.zon'), 'utf8'));
+    expect(zones.length).toBeGreaterThan(350);
+
+    const water = parseWaterDatText(fs.readFileSync(path.join(dataDir, 'water.dat'), 'utf8'));
+    expect(water.length).toBe(307);
+
+    const vehIde = parseIdeText(
+      fs.readFileSync(path.join(dataDir, 'vehicles.ide'), 'utf8'),
+      'vehicles.ide'
+    );
+    expect(vehIde.vehicles.length).toBeGreaterThanOrEqual(200);
+
+    const carcols = parseCarcolsText(
+      fs.readFileSync(path.join(dataDir, 'carcols.dat'), 'utf8')
+    );
+    expect(carcols.palette.length).toBeGreaterThanOrEqual(120);
+
+    const weapons = parseWeaponDatText(
+      fs.readFileSync(path.join(dataDir, 'weapon.dat'), 'utf8')
+    );
+    expect(weapons.length).toBeGreaterThan(20);
+  });
+
+  it('parses real RenderWare 3.6.0.3 (0x1803FFFF) .DFF binary meshes (carlshou1_lae2.dff, sweetshou1_lae2.dff)', () => {
+    const dataDir = path.resolve(process.cwd(), 'public/gtasa-data');
+    const carlBuf = fs.readFileSync(path.join(dataDir, 'carlshou1_lae2.dff'));
+    const carlMesh = parseRenderWareDffMesh(
+      carlBuf.buffer.slice(carlBuf.byteOffset, carlBuf.byteOffset + carlBuf.byteLength),
+      'carlshou1_lae2.dff'
+    );
+    expect(carlMesh).not.toBeNull();
+    expect(carlMesh?.rwVersion).toBe(0x1803ffff);
+    expect(carlMesh?.numVertices).toBe(840);
+    expect(carlMesh?.numTriangles).toBe(531);
+    expect(carlMesh?.hasPrelit).toBe(true);
+    expect(carlMesh?.hasNightColors).toBe(true);
+    expect(carlMesh?.materials.length).toBe(11);
   });
 });

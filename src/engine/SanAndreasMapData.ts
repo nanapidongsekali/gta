@@ -65,6 +65,25 @@ export function worldToCanonicalSaCoords(
   ];
 }
 
+/**
+ * Inverse mapping from canonical GTA:SA [-3000..+3000] (saX, saY, saZ)
+ * to 3D engine (worldX, worldY, worldZ).
+ */
+export function canonicalSaToWorldCoords(
+  saX: number,
+  saY: number,
+  saZ = 13.5
+): [number, number, number] {
+  const worldX = Number(((saX - 2495) / 4.2).toFixed(1));
+  const worldZ = Number(((-1668 - saY) / 4.2).toFixed(1));
+  const worldY = Math.max(0, Number((saZ - 13.5).toFixed(1)));
+  return [
+    Math.max(-540, Math.min(540, worldX)),
+    worldY,
+    Math.max(-460, Math.min(380, worldZ)),
+  ];
+}
+
 export const SAN_ANDREAS_BOOKMARKS: SaBookmarkLocation[] = [
   {
     id: 'LOC_GROVE_CULDESAC',

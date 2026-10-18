@@ -50,6 +50,7 @@ interface Props {
     drawer: 'NONE' | 'GRAPHICS' | 'CHEATS' | 'VEHICLES' | 'MISSIONS' | 'STUDIO_REA'
   ) => void;
   onOpenFullMap: () => void;
+  onOpenReWorkbench?: () => void;
   customWaypoint: [number, number] | null;
   currentStation: RadioStationInfo;
   onCycleRadio: () => void;
@@ -79,6 +80,7 @@ export const GtaHud: React.FC<Props> = ({
   activeDrawer,
   onSetActiveDrawer,
   onOpenFullMap,
+  onOpenReWorkbench,
   customWaypoint,
   currentStation,
   onCycleRadio,
@@ -152,6 +154,17 @@ export const GtaHud: React.FC<Props> = ({
               <Map className="h-4 w-4 stroke-[2]" />
               <span>Full Map [M]</span>
             </button>
+
+            {onOpenReWorkbench && (
+              <button
+                type="button"
+                onClick={onOpenReWorkbench}
+                className="flex min-h-[40px] items-center gap-2 rounded-xl bg-amber-500/20 border border-amber-400/40 px-3.5 py-2 text-xs font-bold text-amber-300 transition-[transform,background-color] duration-150 hover:bg-amber-500/30 active:scale-[0.96]"
+              >
+                <Cpu className="h-4 w-4 stroke-[2]" />
+                <span>RE Decompiler [F2]</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -483,76 +496,60 @@ export const GtaHud: React.FC<Props> = ({
               }}
             />
 
-            {/* Real-Time Rotating Vector Cartography centered on CJ */}
+            {/* Real-Time Rotating Official GTA:SA Radar Tile Map (radar00..143) centered on CJ */}
             <svg
-              viewBox={`${telemetry.playerX - 135} ${telemetry.playerZ - 135} 270 270`}
+              viewBox={`${saCoords[0] - 280} ${-saCoords[1] - 280} 560 560`}
               className="absolute inset-0 h-full w-full"
               style={{
                 transform: `rotate(${(telemetry.headingRad * 180) / Math.PI}deg)`,
               }}
             >
-              {/* Glen Park Pond on Radar */}
-              <circle cx={45} cy={-115} r={22} fill="#0284c7" />
-
-              {/* Roads, Freeways, Storm Drain Canal & Rail */}
-              {SAN_ANDREAS_ROAD_NETWORK.map((road) => {
-                const pointsAttr = road.points
-                  .map(([px, pz]) => `${px},${pz}`)
-                  .join(' ');
-                const strokeColor =
-                  road.kind === 'canal'
-                    ? '#0284c7'
-                    : road.kind === 'freeway'
-                    ? '#eab308'
-                    : road.kind === 'rail'
-                    ? '#a16207'
-                    : '#71717a';
-                return (
-                  <polyline
-                    key={road.id}
-                    points={pointsAttr}
-                    fill="none"
-                    stroke={strokeColor}
-                    strokeWidth={road.width * 0.75}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                );
-              })}
-
-              {/* Iconic East-Facing Grove Street Cul-de-Sac Ring at (28, 0) */}
-              <circle
-                cx={28}
-                cy={0}
-                r={18}
-                fill="#3f3f46"
-                stroke="#22c55e"
-                strokeWidth="3.5"
+              <rect
+                x={-3000}
+                y={-3000}
+                width={6000}
+                height={6000}
+                fill="#446482"
               />
-              <circle cx={28} cy={0} r={6.5} fill="#15803d" />
+              <image
+                href="/gtasa-data/full_map.webp"
+                x={-3000}
+                y={-3000}
+                width={6000}
+                height={6000}
+                preserveAspectRatio="none"
+              />
 
-              {/* Custom GPS Waypoint Line */}
-              {customWaypoint && (
-                <g>
-                  <line
-                    x1={telemetry.playerX}
-                    y1={telemetry.playerZ}
-                    x2={customWaypoint[0]}
-                    y2={customWaypoint[1]}
-                    stroke="#ef4444"
-                    strokeWidth="4"
-                    strokeDasharray="7 5"
-                  />
-                  <circle
-                    cx={customWaypoint[0]}
-                    cy={customWaypoint[1]}
-                    r={9}
-                    fill="#ef4444"
-                    stroke="#000"
-                    strokeWidth="3"
-                  />
-                </g>
-              )}
+              {/* Custom GPS Waypoint Line in Canonical SA Space */}
+              {customWaypoint &&
+                (() => {
+                  const wpSa = worldToCanonicalSaCoords(
+                    customWaypoint[0],
+                    0,
+                    customWaypoint[1]
+                  );
+                  return (
+                    <g>
+                      <line
+                        x1={saCoords[0]}
+                        y1={-saCoords[1]}
+                        x2={wpSa[0]}
+                        y2={-wpSa[1]}
+                        stroke="#ef4444"
+                        strokeWidth="8"
+                        strokeDasharray="16 10"
+                      />
+                      <circle
+                        cx={wpSa[0]}
+                        cy={-wpSa[1]}
+                        r={16}
+                        fill="#ef4444"
+                        stroke="#000"
+                        strokeWidth="5"
+                      />
+                    </g>
+                  );
+                })()}
             </svg>
 
             {/* Clamped Edge & Interior Blips */}
