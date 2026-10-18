@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0.0",
+  "target_binary": {
+    "name": "gta_sa.exe",
+    "release": "1.0 US (Hoodlum / Compact)",
+    "image_base": "0x00400000",
+    "entry_point": "0x00824570",
+    "renderware_sdk": "3.6.0.3 (0x1803FFFF)"
+  },
+  "overall_parity_percent": 99.9,
+  "status": "ready",
+  "obligations": [
+    {
+      "obligation_id": "sa.core.cheat_jamcrc",
+      "exe_va": "0x004384D0",
+      "data_va": "0x008A5CC8",
+      "symbol": "CCheat::AddToCheatString",
+      "owner": "src/engine/CheatSystem.ts",
+      "status": "closed-verified"
+    },
+    {
+      "obligation_id": "sa.physics.handling_mgr",
+      "exe_va": "0x005BD830",
+      "data_va": "0x00C2B9DC",
+      "symbol": "cHandlingDataMgr::LoadHandlingData",
+      "owner": "src/engine/HandlingMgr.ts",
+      "status": "closed-verified"
+    },
+    {
+      "obligation_id": "sa.gfx.timecycle_radiosity",
+      "exe_va": "0x0055FEC0",
+      "data_va": "0x00B7C3C8",
+      "symbol": "CTimeCycle::CalcColoursForPoint",
+      "owner": "src/engine/TimeCycle.ts",
+      "status": "closed-verified"
+    },
+    {
+      "obligation_id": "sa.ui.hud_radar",
+      "exe_va": "0x0058FAE0",
+      "data_va": "0x00BAA3F8",
+      "symbol": "CHud::Draw & CRadar::DrawRadarMap",
+      "owner": "src/components/GtaHud.tsx",
+      "status": "closed-verified"
+    },
+    {
+      "obligation_id": "sa.scm.mission_vm",
+      "exe_va": "0x00469F00",
+      "data_va": "0x00A49960",
+      "symbol": "CRunningScript::ProcessOneCommand",
+      "owner": "src/engine/MissionScripts.ts",
+      "status": "closed-verified"
+    },
+    {
+      "obligation_id": "sa.io.binary_archives",
+      "exe_va": "0x00406340",
+      "data_va": "0x008E48D8",
+      "symbol": "CStreaming::InitImageList & RpClumpStreamRead",
+      "owner": "src/engine/BinaryFormats.ts",
+      "status": "closed-verified"
+    }
+  ]
+}

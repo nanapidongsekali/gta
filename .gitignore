@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+.cache/
+*.log
+*.tsbuildinfo
+.DS_Store
+# Licensed user-supplied binary archives (never commit proprietary binaries)
+licensed-assets/*.zip
+licensed-assets/*.img
+licensed-assets/*.exe
