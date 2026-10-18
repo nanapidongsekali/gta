@@ -1,0 +1,19 @@
+{
+  "name": "senja-city",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Open-world sandbox original bergaya GTA klasik, latar kota Indonesia fiktif. 100% aset & kode original.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Senja City — Open World Sandbox</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Ccircle cx='16' cy='18' r='8' fill='%23ffb454'/%3E%3Crect y='22' width='32' height='10' fill='%230b1020'/%3E%3Crect y='21' width='32' height='2' fill='%23ff6b6b'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="vignette"></div>
+
+  <!-- HUD utama -->
+  <div id="hud" class="hidden">
+    <div id="hud-tr">
+      <div id="clock"><span id="clock-time">16:30</span><span id="clock-day">Jumat</span></div>
+      <div id="money">$0</div>
+      <div id="stars" aria-label="tingkat kejaran polisi"></div>
+    </div>
+
+    <div id="hud-bl">
+      <div id="minimap-wrap">
+        <canvas id="minimap" width="440" height="440"></canvas>
+        <div id="minimap-ring"></div>
+      </div>
+      <div id="healthbar"><div id="healthfill"></div></div>
+    </div>
+
+    <div id="hud-br">
+      <div id="carname"></div>
+      <div id="speedwrap"><span id="speed">0</span><span id="speedunit">km/j</span></div>
+    </div>
+
+    <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+    <div id="prompt"></div>
+    <div id="toasts"></div>
+  </div>
+
+  <!-- Layar loading -->
+  <div id="overlay-loading" class="overlay">
+    <div class="loading-inner">
+      <div class="title-kicker">Proyek game original — bukan produk Rockstar Games</div>
+      <h1 class="title">SENJA<span>CITY</span></h1>
+      <p class="tagline">Kerja, nyetir, dan terima akibatnya di kota yang tak pernah benar-benar tidur.</p>
+      <div class="loadbar"><div id="loadfill"></div></div>
+      <div id="loadlabel">Menyiapkan dunia…</div>
+      <button id="btn-start" class="btn btn-primary" disabled>Muat dunia dulu…</button>
+      <div id="loadtip" class="tip"></div>
+    </div>
+  </div>
+
+  <!-- Menu pause -->
+  <div id="overlay-pause" class="overlay hidden">
+    <div class="panel">
+      <h2>Jeda</h2>
+      <button id="btn-resume" class="btn btn-primary">Lanjut Main</button>
+
+      <div class="panel-section">
+        <h3>Pengaturan</h3>
+        <label class="row"><span>Kualitas grafis</span>
+          <select id="set-quality">
+            <option value="low">Rendah</option>
+            <option value="medium">Sedang</option>
+            <option value="high">Tinggi</option>
+          </select>
+        </label>
+        <label class="row"><span>Suara</span>
+          <select id="set-sound"><option value="1">Nyala</option><option value="0">Mati</option></select>
+        </label>
+        <label class="row"><span>Radio Senja</span>
+          <select id="set-radio"><option value="1">Nyala</option><option value="0">Mati</option></select>
+        </label>
+        <label class="row"><span>Sensitivitas mouse</span>
+          <input id="set-sens" type="range" min="0.3" max="2.5" step="0.1" value="1" />
+        </label>
+      </div>
+
+      <div class="panel-section">
+        <h3>Kontrol</h3>
+        <table class="controls">
+          <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>gerak / setir</td></tr>
+          <tr><td><kbd>Shift</kbd></td><td>lari</td></tr>
+          <tr><td><kbd>Spasi</kbd></td><td>loncat / rem tangan</td></tr>
+          <tr><td><kbd>F</kbd></td><td>masuk / keluar kendaraan</td></tr>
+          <tr><td><kbd>Klik kiri</kbd></td><td>tinju (jalan kaki)</td></tr>
+          <tr><td><kbd>H</kbd></td><td>klakson</td></tr>
+          <tr><td><kbd>R</kbd></td><td>radio on/off</td></tr>
+          <tr><td><kbd>M</kbd></td><td>peta besar</td></tr>
+          <tr><td><kbd>Esc</kbd> / <kbd>P</kbd></td><td>jeda</td></tr>
+          <tr><td>Scroll</td><td>zoom kamera</td></tr>
+        </table>
+      </div>
+
+      <div class="panel-section about">
+        <h3>Tentang</h3>
+        <p>Senja City v0.1 — sandbox open-world original yang terinspirasi nuansa game kriminal klasik era 2000-an. Semua kode, model, dan aset dibuat dari nol untuk proyek ini.</p>
+        <p id="savestate">Progres tersimpan otomatis di browser ini.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Peta besar -->
+  <div id="overlay-map" class="overlay hidden">
+    <div class="map-inner">
+      <canvas id="bigmap" width="1024" height="1024"></canvas>
+      <div class="map-legend">
+        <span><i class="lg lg-home"></i>Kurir</span>
+        <span><i class="lg lg-mission"></i>Target misi</span>
+        <span><i class="lg lg-coin"></i>Koin Senja</span>
+        <span><i class="lg lg-cop"></i>Polisi</span>
+        <span class="map-close">Tekan <kbd>M</kbd> untuk menutup</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layar tumbang / tertangkap -->
+  <div id="overlay-dead" class="overlay hidden">
+    <div class="dead-inner">
+      <h1 id="dead-title">TUMBANG</h1>
+      <p id="dead-sub"></p>
+    </div>
+  </div>
+
+  <div id="err" class="hidden"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
